@@ -1,0 +1,165 @@
+# name: test/sql/basic.test
+# description: bson worker — BSON decode / Extended JSON / typed field / validation
+#              / ObjectId & Timestamp helpers / bson_seq & mongodump_read, over
+#              committed hex + a small mongodump .bson fixture (no network).
+# group: [sql]
+
+require-env VGI_BSON_WORKER
+
+# The community `vgi` extension hosts the worker protocol type.
+statement ok
+LOAD vgi;
+
+statement ok
+ATTACH 'bson' AS bson (TYPE vgi, LOCATION '${VGI_BSON_WORKER}');
+
+statement ok
+SET search_path='bson.main';
+
+# --- from_json / to_json (Extended JSON v2) ------------------------------
+
+# Canonical wraps the typed value; relaxed renders it natively.
+query T
+SELECT to_json(from_json('{"a":1}'));
+----
+{"a":{"$numberInt":"1"}}
+
+query T
+SELECT to_json(from_json('{"a":1}'), 'relaxed');
+----
+{"a":1}
+
+# from_json -> BSON bytes (12-byte {a:1} document).
+query T
+SELECT to_hex(from_json('{"a":1}'));
+----
+0C0000001061000100000000
+
+# decode returns canonical Extended JSON (the stable lossless column).
+query T
+SELECT decode(from_json('{"a":1}'));
+----
+{"a":{"$numberInt":"1"}}
+
+# --- field (dotted-path extract + typed coercion) ------------------------
+
+query T
+SELECT field(from_json('{"o":{"sku":"abc"}}'), 'o.sku');
+----
+abc
+
+query T
+SELECT field(from_json('{"_id":{"$oid":"54759eb3c090d83494e2d804"}}'), '_id', 'objectid');
+----
+54759eb3c090d83494e2d804
+
+# Lossless typed projection a naive JSON path would corrupt: Decimal128 + UUID.
+query T
+SELECT field(from_json('{"amount":{"$numberDecimal":"123.45"}}'), 'amount', 'decimal')::DECIMAL(38,4);
+----
+123.4500
+
+query T
+SELECT field(from_json('{"tenant":{"$binary":{"base64":"q6urq6urq6urq6urq6urqw==","subType":"04"}}}'), 'tenant', 'uuid')::UUID;
+----
+abababab-abab-abab-abab-abababababab
+
+# --- type_of / keys ------------------------------------------------------
+
+query T
+SELECT type_of(from_json('{"a":1}'));
+----
+object
+
+query T
+SELECT type_of(from_json('{"_id":{"$oid":"54759eb3c090d83494e2d804"}}'), '_id');
+----
+objectId
+
+query T
+SELECT keys(from_json('{"z":1,"a":2,"m":3}'));
+----
+[z, a, m]
+
+# --- validation (never crashes the scan) ---------------------------------
+
+query T
+SELECT is_valid(from_hex('0500000000'));
+----
+true
+
+query T
+SELECT (well_formed(from_hex('0c00000010610001'))).kind;
+----
+truncated
+
+query T
+SELECT (well_formed(from_hex('0c0000001061000100000000ff'))).kind;
+----
+trailing-bytes
+
+# A NULL input is NULL, not an error.
+query T
+SELECT is_valid(NULL::BLOB);
+----
+NULL
+
+# --- ObjectId helpers ----------------------------------------------------
+
+query T
+SELECT objectid_hex(objectid_from_hex('54759eb3c090d83494e2d804'));
+----
+54759eb3c090d83494e2d804
+
+# Embedded creation timestamp (first 4 bytes = epoch seconds).
+query T
+SELECT objectid_timestamp('54759eb3c090d83494e2d804')::VARCHAR;
+----
+2014-11-26 09:34:43+00
+
+# --- Timestamp helpers (0x11 replication clock) --------------------------
+
+query I
+SELECT (timestamp_parts({'t': 1416994483, 'i': 7})).i;
+----
+7
+
+query T
+SELECT timestamp_to_ts({'t': 1416994483, 'i': 7})::VARCHAR;
+----
+2014-11-26 09:34:43+00
+
+# --- encode (DuckDB value -> BSON) ---------------------------------------
+
+# encode∘from_json round-trips {a:1} to identical bytes.
+query T
+SELECT to_hex(encode({'a': 1}));
+----
+0C0000001061000100000000
+
+# --- bson_seq (concatenated length-prefixed stream) ----------------------
+
+query II
+SELECT idx, octet_length(doc) FROM bson_seq(from_hex('05000000000500000000')) ORDER BY idx;
+----
+0	5
+1	5
+
+# --- mongodump_read (.bson file glob) ------------------------------------
+
+query I
+SELECT count(*) FROM mongodump_read('test/data/users.bson');
+----
+3
+
+query T
+SELECT field(doc, 'name') FROM mongodump_read('test/data/users.bson') WHERE idx = 1;
+----
+bob
+
+# --- version -------------------------------------------------------------
+
+query T
+SELECT bson_version() = '0.1.0';
+----
+true
