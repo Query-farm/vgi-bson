@@ -22,6 +22,7 @@ impl ScalarFunction for ObjectIdTimestamp {
     fn metadata(&self) -> FunctionMetadata {
         let mut tags = crate::meta::object_tags(
             "ObjectId Embedded Timestamp",
+            "ObjectId",
             "Return the creation time embedded in an ObjectId as a TIMESTAMPTZ — the first 4 bytes \
              of every ObjectId are the seconds since the Unix epoch. Accepts either a 24-char hex \
              VARCHAR or a 12-byte BLOB. This is the cheap \"when was this document first written\" \
@@ -47,7 +48,8 @@ impl ScalarFunction for ObjectIdTimestamp {
         vec![ArgSpec::any_column(
             "oid",
             0,
-            "An ObjectId as a 24-char hex VARCHAR or a 12-byte BLOB.",
+            "An ObjectId, given either as its 24-character hexadecimal string or as its 12 raw \
+             bytes.",
         )]
     }
 
@@ -85,6 +87,7 @@ impl ScalarFunction for ObjectIdHex {
     fn metadata(&self) -> FunctionMetadata {
         let mut tags = crate::meta::object_tags(
             "ObjectId to Hex",
+            "ObjectId",
             "Convert a 12-byte ObjectId BLOB to its 24-char lowercase hexadecimal string. Returns \
              NULL when the input is not exactly 12 bytes. The inverse of objectid_from_hex.",
             "12-byte ObjectId BLOB → 24-char hex VARCHAR.",
@@ -134,6 +137,7 @@ impl ScalarFunction for ObjectIdFromHex {
     fn metadata(&self) -> FunctionMetadata {
         let mut tags = crate::meta::object_tags(
             "Parse an ObjectId Hex String to Bytes",
+            "ObjectId",
             "Convert a 24-char hexadecimal ObjectId string to its 12-byte BLOB form. Returns NULL \
              for a string that is not a valid 24-char ObjectId. The inverse of objectid_hex.",
             "24-char hex VARCHAR → 12-byte ObjectId BLOB.",

@@ -30,6 +30,7 @@ impl TableFunction for BsonSeq {
     fn metadata(&self) -> FunctionMetadata {
         let mut tags = crate::meta::object_tags(
             "BSON Sequence Split",
+            "Streams",
             "Split a BLOB holding N concatenated length-prefixed BSON documents (each is `int32 \
              length ++ body ++ 0x00`) into one row per document: columns idx (BIGINT, zero-based \
              position) and doc (BLOB, the single document's bytes). This is exactly the wire shape \
@@ -68,7 +69,8 @@ impl TableFunction for BsonSeq {
             "stream",
             0,
             "blob",
-            "A BLOB of N concatenated length-prefixed BSON documents.",
+            "N concatenated length-prefixed BSON documents — the wire body of a mongodump `.bson` \
+             file, an oplog batch, or a GridFS reassembly.",
         )]
     }
 

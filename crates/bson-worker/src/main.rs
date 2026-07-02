@@ -48,20 +48,19 @@ fn catalog_metadata(name: &str) -> CatalogModel {
             ),
             (
                 "vgi.doc_llm".to_string(),
-                "Decode and encode BSON (Binary JSON, bsonspec.org) blobs in SQL with lossless, \
-                 typed handling of BSON's rich type zoo: ObjectId, Decimal128, Binary subtypes \
-                 (incl. UUID 0x04 and encrypted/FLE), Timestamp-vs-UTCDateTime, Int32/Int64/Double, \
-                 Regex, MinKey/MaxKey, DBPointer, Code/CodeWScope. `decode` / `to_json` render any \
-                 document to MongoDB Extended JSON v2 (canonical = lossless, relaxed = readable); \
-                 `from_json` / `encode` go the other way; `field(doc, path, as)` projects one typed \
-                 leaf by dotted path. `is_valid` / `well_formed` give untrusted-input-safe checks \
-                 that never crash the scan. ObjectId helpers (objectid_timestamp / objectid_hex / \
-                 objectid_from_hex) and Timestamp helpers (timestamp_to_ts / timestamp_parts) read \
-                 the typed sub-values. The `bson_seq` and `mongodump_read` table functions fan a \
-                 concatenated length-prefixed BSON stream (a mongodump `.bson` file, an oplog \
-                 batch, a GridFS reassembly) into one row per document. It decodes the raw BSON the \
-                 live mongo connector never sees — dumps, oplog, GridFS, BSON-at-rest. Pure \
-                 in-engine compute over a BLOB column: no network, no state, zero egress."
+                "Decode and encode BSON (Binary JSON, bsonspec.org) in SQL with lossless, typed \
+                 handling of BSON's rich type zoo — ObjectId, Decimal128, Binary subtypes \
+                 (including UUID 0x04 and encrypted / FLE payloads), the Timestamp-vs-UTCDateTime \
+                 footgun, Int32 / Int64 / Double, Regex, MinKey / MaxKey, DBPointer, and Code — \
+                 plus correct MongoDB Extended JSON v2 in both canonical (type-preserving, \
+                 lossless) and relaxed (human-readable) forms. Reach for this worker to put the raw \
+                 BSON the live MongoDB connector never sees to work in SQL: mongodump backups, \
+                 oplog and change-stream captures, GridFS chunks, and BSON columns already at rest \
+                 in the warehouse. Everything runs as pure in-engine scalar and table compute over \
+                 a BLOB column — no network, no state, zero egress — so it is the offline / \
+                 at-rest complement to a live connection, not a driver. Encrypted (FLE / \
+                 Queryable-Encryption) values stay opaque. Discover the concrete functions by \
+                 listing the schema."
                     .to_string(),
             ),
             (
@@ -93,6 +92,48 @@ fn catalog_metadata(name: &str) -> CatalogModel {
                 "vgi.support_policy_url".to_string(),
                 "https://github.com/Query-farm/vgi-bson/blob/main/README.md".to_string(),
             ),
+            (
+                "vgi.agent_test_tasks".to_string(),
+                // Deterministic, self-contained analyst tasks for `vgi-lint simulate`
+                // (VGI152/VGI920). Each reference query builds its own BSON from a
+                // literal (from_json / from_hex) so there is no external-file or
+                // ordering dependency; `ignore_column_names` lets the analyst pick any
+                // alias, and `unordered` frees the row order of the stream-split task.
+                r#"[
+  {
+    "name": "json-roundtrip",
+    "prompt": "Using the bson worker, encode the JSON document {\"a\":1} to BSON bytes and then render those bytes back to canonical MongoDB Extended JSON.",
+    "reference_sql": "SELECT bson.main.to_json(bson.main.from_json('{\"a\":1}'))",
+    "ignore_column_names": true
+  },
+  {
+    "name": "field-extract",
+    "prompt": "Using the bson worker, extract the value at the dotted path o.sku from the BSON encoding of the JSON document {\"o\":{\"sku\":\"abc\"}}.",
+    "reference_sql": "SELECT bson.main.field(bson.main.from_json('{\"o\":{\"sku\":\"abc\"}}'), 'o.sku')",
+    "ignore_column_names": true
+  },
+  {
+    "name": "objectid-created-time",
+    "prompt": "Using the bson worker, return the creation time embedded in the ObjectId whose hexadecimal string is 54759eb3c090d83494e2d804.",
+    "reference_sql": "SELECT bson.main.objectid_timestamp('54759eb3c090d83494e2d804')",
+    "ignore_column_names": true
+  },
+  {
+    "name": "validate-document",
+    "prompt": "Using the bson worker, determine whether the bytes produced by from_hex('0500000000') are a single well-formed BSON document.",
+    "reference_sql": "SELECT bson.main.is_valid(from_hex('0500000000'))",
+    "ignore_column_names": true
+  },
+  {
+    "name": "split-stream",
+    "prompt": "Using the bson worker, split the concatenated BSON byte stream from_hex('05000000000500000000') into one row per contained document and return each document's zero-based index.",
+    "reference_sql": "SELECT idx FROM bson.main.bson_seq(from_hex('05000000000500000000'))",
+    "unordered": true,
+    "ignore_column_names": true
+  }
+]"#
+                .to_string(),
+            ),
         ],
         source_url: Some("https://github.com/Query-farm/vgi-bson".to_string()),
         schemas: vec![CatSchema {
@@ -116,21 +157,43 @@ fn catalog_metadata(name: &str) -> CatalogModel {
                 ("category".to_string(), "parsing-and-serialization".to_string()),
                 ("topic".to_string(), "bson-mongodb".to_string()),
                 (
+                    "vgi.categories".to_string(),
+                    r#"[
+  {"name": "Codec", "description": "Decode and encode BSON, bridging documents to and from MongoDB Extended JSON v2 and DuckDB values."},
+  {"name": "Validation", "description": "Structural well-formedness checks that stay total on hostile input."},
+  {"name": "Projection", "description": "Extract a typed leaf, its BSON type, or the key set from a document by dotted path."},
+  {"name": "ObjectId", "description": "Convert ObjectIds between hex and bytes and read their embedded creation time."},
+  {"name": "Timestamp", "description": "Read the BSON internal (replication-clock) Timestamp's parts and wall-clock second."},
+  {"name": "Streams", "description": "Fan a concatenated length-prefixed BSON stream (mongodump / oplog / GridFS) into rows."},
+  {"name": "Diagnostics", "description": "Introspect the running worker, such as its build version."}
+]"#
+                    .to_string(),
+                ),
+                (
                     "vgi.doc_llm".to_string(),
-                    "Functions for BSON / MongoDB Extended JSON. Codec: `decode`, `to_json`, \
-                     `from_json`, `encode`, `is_valid`, `well_formed`. Projection: `field`, \
-                     `type_of`, `keys`. ObjectId: `objectid_timestamp`, `objectid_hex`, \
-                     `objectid_from_hex`. Timestamp: `timestamp_to_ts`, `timestamp_parts`. Table \
-                     functions: `bson_seq` (concatenated stream) and `mongodump_read` (`.bson` \
-                     file glob)."
+                    "The single schema for the bson worker; because the catalog name matches the \
+                     ATTACH name, qualify calls as `bson.main.<name>`. It groups the worker's \
+                     surface into a few families: a BSON ↔ Extended JSON v2 codec; structural \
+                     validity checks that stay total on hostile input (a bad row never crashes the \
+                     scan); typed field, type, and shape projection by dotted path; ObjectId and \
+                     internal-Timestamp (replication-clock) helpers; and table functions that fan \
+                     a concatenated length-prefixed BSON stream — a mongodump file, an oplog \
+                     batch, a GridFS reassembly — into one row per document. List the schema to \
+                     see the individual functions and their signatures."
                         .to_string(),
                 ),
                 (
                     "vgi.doc_md".to_string(),
-                    "The single schema for the `bson` worker — the catalog name matches the \
-                     `ATTACH` name, so qualify calls as `bson.main.<fn>(...)`. Holds the BSON \
-                     codec scalars, the Extended-JSON bridge, typed field extraction, the ObjectId \
-                     / Timestamp helpers, and the `bson_seq` / `mongodump_read` table functions."
+                    "## bson.main\n\n\
+                     The single schema of the `bson` worker. The catalog name matches the \
+                     `ATTACH` name, so qualify calls as `bson.main.<name>`.\n\n\
+                     It covers the whole offline BSON surface, grouped into a few families: a \
+                     BSON ↔ Extended JSON v2 **codec**, structural **validity** checks that stay \
+                     total on hostile input, typed dotted-path **projection**, **ObjectId** and \
+                     internal-**Timestamp** helpers, and **stream**-splitting table functions for \
+                     mongodump / oplog / GridFS data.\n\n\
+                     List the schema to browse the individual functions and their signatures, or \
+                     use the `vgi.categories` groupings to see where each one fits."
                         .to_string(),
                 ),
                 (

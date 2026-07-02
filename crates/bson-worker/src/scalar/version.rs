@@ -20,6 +20,7 @@ impl ScalarFunction for BsonVersion {
     fn metadata(&self) -> FunctionMetadata {
         let mut tags = crate::meta::object_tags(
             "BSON Worker Version",
+            "Diagnostics",
             "Return the semantic version string of the running bson worker binary (the worker's \
              own build version, not the SDK/protocol version). The string is MAJOR.MINOR.PATCH \
              (e.g. '0.1.0'). Takes no arguments and is deterministic — it always returns the same \

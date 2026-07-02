@@ -37,6 +37,7 @@ impl TableFunction for MongodumpRead {
     fn metadata(&self) -> FunctionMetadata {
         let mut tags = crate::meta::object_tags(
             "Read mongodump .bson Files",
+            "Streams",
             "Read a glob of mongodump `.bson` files (each a concatenation of length-prefixed BSON \
              documents) and fan them into one row per document: columns idx (BIGINT, per-file \
              zero-based position), doc (BLOB, one document), and file (VARCHAR, the source path). \

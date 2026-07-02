@@ -21,15 +21,19 @@ pub fn keywords_json(keywords: &str) -> String {
     format!("[{}]", items.join(","))
 }
 
-/// Build the four standard per-object discovery tags.
+/// Build the standard per-object discovery tags. `category` names one of the
+/// schema's `vgi.categories` (VGI413), so listings and navigation can group this
+/// object.
 pub fn object_tags(
     title: &str,
+    category: &str,
     description_llm: &str,
     description_md: &str,
     keywords: &str,
 ) -> Vec<(String, String)> {
     vec![
         ("vgi.title".to_string(), title.to_string()),
+        ("vgi.category".to_string(), category.to_string()),
         ("vgi.doc_llm".to_string(), description_llm.to_string()),
         ("vgi.doc_md".to_string(), description_md.to_string()),
         ("vgi.keywords".to_string(), keywords_json(keywords)),

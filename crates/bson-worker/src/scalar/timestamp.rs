@@ -15,8 +15,8 @@ fn ts_input_spec() -> ArgSpec {
     ArgSpec::any_column(
         "ts",
         0,
-        "A BSON Timestamp as the decoded STRUCT(t UINTEGER, i UINTEGER) — the (seconds, \
-         increment) replication clock pair.",
+        "A BSON internal replication-clock value in its decoded (t, i) form — the (seconds, \
+         increment) pair.",
     )
 }
 
@@ -31,6 +31,7 @@ impl ScalarFunction for TimestampToTs {
     fn metadata(&self) -> FunctionMetadata {
         let mut tags = crate::meta::object_tags(
             "BSON Timestamp → TIMESTAMPTZ",
+            "Timestamp",
             "Convert a BSON internal Timestamp (the decoded STRUCT(t, i) replication clock) to a \
              second-resolution TIMESTAMPTZ from its `t` (seconds-since-epoch) component — the \
              oplog ordering clock. NOTE this is the MongoDB-internal 0x11 Timestamp, NOT the \
@@ -83,6 +84,7 @@ impl ScalarFunction for TimestampParts {
     fn metadata(&self) -> FunctionMetadata {
         let mut tags = crate::meta::object_tags(
             "BSON Timestamp Parts",
+            "Timestamp",
             "Normalize a BSON internal Timestamp to STRUCT(t UINTEGER, i UINTEGER) — the raw \
              (time-in-seconds, increment) pair of the 0x11 replication clock. `t` orders ops to \
              the second; `i` breaks ties within the same second. Use timestamp_to_ts for a \

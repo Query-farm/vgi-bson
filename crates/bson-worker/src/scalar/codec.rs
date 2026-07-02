@@ -66,6 +66,7 @@ blob_scalar! {
     arg_doc = "A BLOB to test for BSON well-formedness.",
     description = "Return true iff the blob is exactly one well-formed BSON document",
     title = "BSON Is-Valid",
+    category = "Validation",
     doc_llm = "Return TRUE iff the blob is exactly one well-formed BSON document per the BSON spec \
         (declared length matches the bytes, types known, cstrings NUL-terminated, valid UTF-8, no \
         trailing bytes). A cheap structural pass — it never allocates a value tree. Never errors \
@@ -85,6 +86,7 @@ blob_scalar! {
     arg_doc = "A BLOB to diagnose for BSON well-formedness.",
     description = "Diagnose BSON well-formedness: STRUCT(ok BOOL, error VARCHAR, kind VARCHAR)",
     title = "BSON Well-Formed Diagnosis",
+    category = "Validation",
     doc_llm = "Diagnose a BSON blob and return STRUCT(ok BOOL, error VARCHAR, kind VARCHAR). \
         `kind` is one of truncated, length-mismatch, trailing-bytes, invalid-type, bad-cstring, \
         bad-utf8, duplicate-key, nesting-limit, bad-decimal128, bad-subtype (NULL when ok). \
@@ -107,6 +109,7 @@ blob_scalar! {
     arg_doc = "A BSON-encoded BLOB whose top-level field names to list.",
     description = "List the top-level field names of a BSON document in document order",
     title = "BSON Keys",
+    category = "Projection",
     doc_llm = "Return the top-level field names of a BSON document as a LIST<VARCHAR>, in document \
         order (BSON preserves insertion order). Use it to discover the shape of a collection's \
         documents or to drive dynamic projection. Returns NULL for a malformed blob.",
@@ -132,6 +135,7 @@ impl ScalarFunction for ToJson {
     fn metadata(&self) -> FunctionMetadata {
         let mut tags = crate::meta::object_tags(
             "BSON → Extended JSON v2",
+            "Codec",
             "Render a BSON document as MongoDB Extended JSON v2. `mode` is 'canonical' (default — \
              the type-preserving, lossless form that wraps every typed value: {\"$oid\":…}, \
              {\"$numberDecimal\":…}, {\"$date\":{\"$numberLong\":…}}, {\"$timestamp\":{t,i}}, \
@@ -225,6 +229,7 @@ impl ScalarFunction for Decode {
     fn metadata(&self) -> FunctionMetadata {
         let mut tags = crate::meta::object_tags(
             "BSON Decode",
+            "Codec",
             "Decode a BSON document to its richest self-describing form. The optional `mode` is \
              'auto' (default), 'struct', 'map', or 'json'. NOTE: a DuckDB scalar fixes its output \
              column type at bind time with no data sample available, so this worker returns \
@@ -316,6 +321,7 @@ impl ScalarFunction for FromJson {
     fn metadata(&self) -> FunctionMetadata {
         let mut tags = crate::meta::object_tags(
             "Extended JSON → BSON",
+            "Codec",
             "Parse a MongoDB Extended JSON v2 string (canonical OR relaxed) into BSON document \
              bytes. Interprets the typed wrappers ({\"$oid\":…}, {\"$numberDecimal\":…}, \
              {\"$date\":…}, {\"$binary\":…}, {\"$timestamp\":…}, …). Round-trips \
@@ -340,7 +346,7 @@ impl ScalarFunction for FromJson {
         vec![ArgSpec::any_column(
             "extjson",
             0,
-            "An Extended JSON v2 string (VARCHAR) to encode as a BSON document.",
+            "MongoDB Extended JSON v2 text (canonical or relaxed) to encode as a BSON document.",
         )]
     }
 
@@ -376,6 +382,7 @@ impl ScalarFunction for Encode {
     fn metadata(&self) -> FunctionMetadata {
         let mut tags = crate::meta::object_tags(
             "BSON Encode",
+            "Codec",
             "Encode a DuckDB value as a BSON document. STRUCT → embedded document; MAP → document; \
              LIST → array; TIMESTAMP/TIMESTAMPTZ → UTCDateTime; UUID → Binary subtype 0x04; BLOB → \
              Binary subtype 0x00; integers → Int32/Int64 by range; DOUBLE → Double; DECIMAL → \
@@ -440,6 +447,7 @@ impl ScalarFunction for Field {
     fn metadata(&self) -> FunctionMetadata {
         let mut tags = crate::meta::object_tags(
             "BSON Field Extract",
+            "Projection",
             "Extract one field from a BSON document by dotted path ('o._id', 'items.0.sku') \
              without materializing the whole document, returning a VARCHAR. The optional `as` \
              argument coerces the leaf to a cast-ready string: 'objectid' → 24-hex, 'decimal' → \
@@ -479,7 +487,8 @@ impl ScalarFunction for Field {
                 "path",
                 1,
                 "varchar",
-                "A dotted field path with numeric array indices, e.g. 'o._id' or 'items.0.sku'.",
+                "A dotted field path; address array elements by their zero-based position, e.g. \
+                 'o._id' or 'items.0.sku'.",
             ),
         ];
         if self.with_as {
@@ -487,8 +496,9 @@ impl ScalarFunction for Field {
                 "as",
                 2,
                 "varchar",
-                "Leaf coercion: 'objectid', 'decimal', 'uuid', 'timestamp', 'datetime', 'blob', \
-                 or 'json'. Omit (NULL) to infer.",
+                "How to coerce the extracted leaf into a cast-ready string; see the accepted mode \
+                 values in the function description. Omit (or NULL) to infer the rendering from \
+                 the leaf.",
             ));
         }
         specs
@@ -544,6 +554,7 @@ impl ScalarFunction for TypeOf {
     fn metadata(&self) -> FunctionMetadata {
         let mut tags = crate::meta::object_tags(
             "BSON Type Of",
+            "Projection",
             "Return the BSON type name at a dotted path: 'objectId', 'decimal128', 'timestamp', \
              'date', 'binData:uuid', 'binData:generic', 'binData:encrypted', 'minKey', 'int', \
              'long', 'double', 'string', 'object', 'array', … . With no `path` (or NULL) it \
