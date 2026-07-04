@@ -103,6 +103,13 @@ jobs:
   audit:
     name: supply-chain audit (cargo-audit)
     runs-on: ubuntu-latest
+    # rustsec/audit-check@v2 posts a check-run with the scan results, which needs
+    # `checks: write`; `contents: read` is enough to read Cargo.lock. Without this
+    # block the default token lacks checks:write and the action fails with
+    # "Resource not accessible by integration ... create-a-check-run".
+    permissions:
+      contents: read
+      checks: write
     steps:
       - uses: actions/checkout@v4
 

@@ -10,7 +10,6 @@ use vgi::{ArgSpec, BindParams, BindResponse, FunctionMetadata, ProcessParams, Sc
 use vgi_rpc::{Result, RpcError};
 
 use crate::arrow_io::{self, blob_bytes};
-use crate::blob_scalar;
 use crate::value_in::encode_document;
 
 fn ve(e: impl std::fmt::Display) -> RpcError {
