@@ -52,18 +52,21 @@ impl TableFunction for MongodumpRead {
              migration, fan-out",
         );
         tags.push((
-            "vgi.result_columns_md".into(),
-            "One row per document across the matched files:\n\n\
-             | column | type | description |\n\
-             |---|---|---|\n\
-             | `idx` | BIGINT | Zero-based position within its file. |\n\
-             | `doc` | BLOB | The bytes of one BSON document. |\n\
-             | `file` | VARCHAR | The source `.bson` file path. |"
+            "vgi.result_columns_schema".into(),
+            r#"[
+  {"name": "idx", "type": "BIGINT", "description": "Zero-based position of the document within its own source file."},
+  {"name": "doc", "type": "BLOB", "description": "The raw bytes of one framed BSON document, ready to feed to decode / to_json / field."},
+  {"name": "file", "type": "VARCHAR", "description": "Path of the source .bson file the document was read from."}
+]"#
                 .into(),
         ));
-        // NOTE: no `vgi.example_queries` — `mongodump_read` always reads external
-        // files, so any example returns zero rows where the files are absent
-        // (VGI902). Documented usage lives in `doc_md` / the schema examples.
+        // The example reads the committed `test/data/users.bson` fixture (three
+        // documents) via a repo-root-relative path, so it returns rows under
+        // `--execute` when the worker's cwd is the checkout root (as in CI).
+        tags.push((
+            "vgi.example_queries".into(),
+            "[{\"description\":\"Count the documents per file in a committed mongodump .bson fixture.\",\"sql\":\"SELECT file, count(*) AS docs FROM bson.main.mongodump_read('test/data/users.bson') GROUP BY file ORDER BY file\"}]".into(),
+        ));
         FunctionMetadata {
             description: "Read a glob of mongodump `.bson` files into one row per document".into(),
             tags,

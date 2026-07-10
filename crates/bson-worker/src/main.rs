@@ -18,8 +18,121 @@ mod scalar;
 mod table;
 mod value_in;
 
-use vgi::catalog::{CatSchema, CatalogModel};
+use vgi::catalog::{CatSchema, CatView, CatalogModel};
 use vgi::Worker;
+
+/// A credential-free, browsable reference view: the BSON element-type registry.
+/// It gives an agent a real table to scan (VGI146) — every BSON type, its type
+/// byte, and its canonical Extended JSON v2 wrapper — before it has to guess a
+/// table-function argument. Backed by an inline `VALUES` list, so it scans purely
+/// inside DuckDB with no worker round-trip and no external state.
+fn bson_types_view() -> CatView {
+    let definition = r#"SELECT * FROM (VALUES
+  ('double',        '0x01', 'numeric',    '{"$numberDouble":"…"}',                              '64-bit IEEE-754 binary floating point.'),
+  ('string',        '0x02', 'text',       'plain JSON string',                                  'UTF-8 string.'),
+  ('object',        '0x03', 'document',   'nested {…}',                                         'Embedded document (preserves field order).'),
+  ('array',         '0x04', 'document',   'JSON array […]',                                     'Array; BSON stores keys as the numeric strings "0","1",… .'),
+  ('binData',       '0x05', 'binary',     '{"$binary":{"base64":"…","subType":"…"}}',           'Binary with a one-byte subtype (0x00 generic, 0x04 UUID, 0x06 encrypted, …).'),
+  ('undefined',     '0x06', 'deprecated', '{"$undefined":true}',                                'Deprecated; modern data uses null.'),
+  ('objectId',      '0x07', 'identifier', '{"$oid":"…"}',                                       '12-byte identifier whose first 4 bytes embed the creation time.'),
+  ('bool',          '0x08', 'scalar',     'true / false',                                       'Boolean.'),
+  ('date',          '0x09', 'temporal',   '{"$date":{"$numberLong":"…"}}',                      'UTCDateTime: milliseconds since the Unix epoch (a wall-clock instant).'),
+  ('null',          '0x0A', 'scalar',     'null',                                               'Null value.'),
+  ('regex',         '0x0B', 'text',       '{"$regularExpression":{"pattern":"…","options":"…"}}','Regular expression.'),
+  ('dbPointer',     '0x0C', 'deprecated', '{"$dbPointer":{"$ref":"…","$id":{"$oid":"…"}}}',     'Deprecated database pointer.'),
+  ('code',          '0x0D', 'code',       '{"$code":"…"}',                                      'JavaScript source without a scope.'),
+  ('symbol',        '0x0E', 'deprecated', '{"$symbol":"…"}',                                    'Deprecated symbol type.'),
+  ('codeWithScope', '0x0F', 'code',       '{"$code":"…","$scope":{…}}',                         'JavaScript source bundled with a scope document.'),
+  ('int',           '0x10', 'numeric',    '{"$numberInt":"…"}',                                 '32-bit signed integer.'),
+  ('timestamp',     '0x11', 'temporal',   '{"$timestamp":{"t":…,"i":…}}',                       'Internal replication clock (t seconds, i increment) — NOT a wall-clock time.'),
+  ('long',          '0x12', 'numeric',    '{"$numberLong":"…"}',                                '64-bit signed integer.'),
+  ('decimal128',    '0x13', 'numeric',    '{"$numberDecimal":"…"}',                             '128-bit IEEE-754 decimal (exact base-10).'),
+  ('minKey',        '0xFF', 'sentinel',   '{"$minKey":1}',                                      'Sorts below every other BSON value.'),
+  ('maxKey',        '0x7F', 'sentinel',   '{"$maxKey":1}',                                      'Sorts above every other BSON value.')
+) AS t(type_name, type_byte, type_class, extjson_wrapper, notes)"#;
+
+    CatView {
+        name: "bson_types".to_string(),
+        definition: definition.to_string(),
+        comment: Some(
+            "The BSON element-type registry: every BSON type, its one-byte type code, and its \
+             canonical Extended JSON v2 wrapper."
+                .to_string(),
+        ),
+        column_comments: vec![
+            (
+                "type_name".to_string(),
+                "The BSON type name as reported by `type_of`, e.g. 'objectId', 'decimal128', \
+                 'timestamp'."
+                    .to_string(),
+            ),
+            (
+                "type_byte".to_string(),
+                "The one-byte BSON element type code, as a 0x?? hex string (0x01–0x13, plus 0xFF \
+                 minKey and 0x7F maxKey)."
+                    .to_string(),
+            ),
+            (
+                "type_class".to_string(),
+                "A coarse grouping for browsing: numeric, text, document, binary, temporal, \
+                 identifier, code, scalar, sentinel, or deprecated."
+                    .to_string(),
+            ),
+            (
+                "extjson_wrapper".to_string(),
+                "The canonical Extended JSON v2 shape a value of this type serializes to (… marks \
+                 the value slot)."
+                    .to_string(),
+            ),
+            (
+                "notes".to_string(),
+                "A one-line semantic note, including the Timestamp-vs-UTCDateTime and \
+                 deprecated-type caveats.".to_string(),
+            ),
+        ],
+        tags: vec![
+            ("vgi.title".to_string(), "BSON Type Registry".to_string()),
+            ("vgi.category".to_string(), "Reference".to_string()),
+            ("domain".to_string(), "data-serialization".to_string()),
+            ("topic".to_string(), "bson-mongodb".to_string()),
+            (
+                "vgi.doc_llm".to_string(),
+                "A static, credential-free reference view listing all 21 BSON element types: the \
+                 type name `type_of` returns, the one-byte type code (0x01–0x13, plus 0xFF minKey \
+                 and 0x7F maxKey), a coarse `type_class` for browsing, the canonical Extended JSON \
+                 v2 wrapper the type serializes to, and a one-line note. Use it to map a `type_of` \
+                 result to its wire code, to see how a type renders in canonical Extended JSON, or \
+                 to spot the footguns — Timestamp (0x11) is a replication clock, not a wall-clock \
+                 time; undefined / dbPointer / symbol are deprecated. It scans instantly with no \
+                 argument, so it is the cheapest way to see real data from this worker."
+                    .to_string(),
+            ),
+            (
+                "vgi.doc_md".to_string(),
+                "A static reference view of the **BSON element-type registry**. One row per BSON \
+                 type, with the name `type_of` returns, its one-byte type code, a coarse \
+                 `type_class`, the canonical **Extended JSON v2** wrapper, and a note.\n\n\
+                 Handy for mapping a `type_of` result to its wire code, seeing how a value renders \
+                 in canonical Extended JSON, or spotting the footguns: `timestamp` (0x11) is the \
+                 replication clock (not a wall-clock time), and `undefined` / `dbPointer` / \
+                 `symbol` are deprecated."
+                    .to_string(),
+            ),
+            (
+                "vgi.keywords".to_string(),
+                meta::keywords_json(
+                    "bson, type registry, type code, type byte, element type, extended json, \
+                     extjson, wrapper, objectid, decimal128, timestamp, binData, subtype, \
+                     reference, catalog",
+                ),
+            ),
+            (
+                "vgi.example_queries".to_string(),
+                "[{\"description\":\"List the temporal BSON types and their Extended JSON wrappers.\",\"sql\":\"SELECT type_name, type_byte, extjson_wrapper FROM bson.main.bson_types WHERE type_class = 'temporal' ORDER BY type_name\"}]".to_string(),
+            ),
+        ],
+    }
+}
 
 /// Catalog + schema metadata surfaced to DuckDB and the `vgi-lint` metadata
 /// linter. The function objects themselves are served from the registered
@@ -102,8 +215,8 @@ fn catalog_metadata(name: &str) -> CatalogModel {
                 r#"[
   {
     "name": "json-roundtrip",
-    "prompt": "Using the bson worker, encode the JSON document {\"a\":1} to BSON bytes and then render those bytes back to canonical MongoDB Extended JSON.",
-    "reference_sql": "SELECT bson.main.to_json(bson.main.from_json('{\"a\":1}'))",
+    "prompt": "Using the bson worker, confirm that the BSON encoding of the JSON document {\"a\":1} round-trips losslessly: rendering it to canonical MongoDB Extended JSON with to_json and parsing that back with from_json must reproduce the original BSON bytes. Return the single boolean result.",
+    "reference_sql": "SELECT bson.main.from_json(bson.main.to_json(bson.main.from_json('{\"a\":1}'))) = bson.main.from_json('{\"a\":1}')",
     "ignore_column_names": true
   },
   {
@@ -120,7 +233,7 @@ fn catalog_metadata(name: &str) -> CatalogModel {
   },
   {
     "name": "validate-document",
-    "prompt": "Using the bson worker, determine whether the bytes produced by from_hex('0500000000') are a single well-formed BSON document.",
+    "prompt": "Using the bson worker's is_valid function, return the single boolean telling whether the bytes produced by from_hex('0500000000') are exactly one well-formed BSON document.",
     "reference_sql": "SELECT bson.main.is_valid(from_hex('0500000000'))",
     "ignore_column_names": true
   },
@@ -129,6 +242,72 @@ fn catalog_metadata(name: &str) -> CatalogModel {
     "prompt": "Using the bson worker, split the concatenated BSON byte stream from_hex('05000000000500000000') into one row per contained document and return each document's zero-based index.",
     "reference_sql": "SELECT idx FROM bson.main.bson_seq(from_hex('05000000000500000000'))",
     "unordered": true,
+    "ignore_column_names": true
+  },
+  {
+    "name": "worker-version",
+    "prompt": "Using the bson worker, return the version string reported by its bson_version function.",
+    "reference_sql": "SELECT bson.main.bson_version()",
+    "ignore_column_names": true
+  },
+  {
+    "name": "decode-to-extjson",
+    "prompt": "Using the bson worker, confirm that decode and to_json agree on the BSON encoding of {\"a\":1}: decode of those bytes must equal to_json of the same bytes in canonical mode. Return the single boolean result.",
+    "reference_sql": "SELECT bson.main.decode(bson.main.from_json('{\"a\":1}')) = bson.main.to_json(bson.main.from_json('{\"a\":1}'), 'canonical')",
+    "ignore_column_names": true
+  },
+  {
+    "name": "encode-struct",
+    "prompt": "Using the bson worker, encode the DuckDB struct {'a': 1} to BSON bytes with the encode function and return the result as an uppercase hexadecimal string.",
+    "reference_sql": "SELECT to_hex(bson.main.encode({'a': 1}))",
+    "ignore_column_names": true
+  },
+  {
+    "name": "list-top-level-keys",
+    "prompt": "Using the bson worker, list the top-level field names, in document order, of the BSON encoding of the JSON document {\"z\":1,\"a\":2,\"m\":3}.",
+    "reference_sql": "SELECT bson.main.keys(bson.main.from_json('{\"z\":1,\"a\":2,\"m\":3}'))",
+    "ignore_column_names": true
+  },
+  {
+    "name": "type-name-at-path",
+    "prompt": "Using the bson worker, report the BSON type name at the field path _id of the document {\"_id\":{\"$oid\":\"54759eb3c090d83494e2d804\"}} encoded with from_json.",
+    "reference_sql": "SELECT bson.main.type_of(bson.main.from_json('{\"_id\":{\"$oid\":\"54759eb3c090d83494e2d804\"}}'), '_id')",
+    "ignore_column_names": true
+  },
+  {
+    "name": "diagnose-truncated",
+    "prompt": "Using the bson worker's well_formed function, return the single boolean telling whether the failure kind it reports for the malformed bytes from_hex('0c00000010610001') is 'truncated'.",
+    "reference_sql": "SELECT (bson.main.well_formed(from_hex('0c00000010610001'))).kind = 'truncated'",
+    "ignore_column_names": true
+  },
+  {
+    "name": "objectid-hex-roundtrip",
+    "prompt": "Using the bson worker, convert the ObjectId hex string 54759eb3c090d83494e2d804 to its 12 raw bytes with objectid_from_hex and then back to a hex string with objectid_hex; return that hex string.",
+    "reference_sql": "SELECT bson.main.objectid_hex(bson.main.objectid_from_hex('54759eb3c090d83494e2d804'))",
+    "ignore_column_names": true
+  },
+  {
+    "name": "timestamp-increment",
+    "prompt": "Using the bson worker, read the increment (i) component from the BSON internal Timestamp struct {'t': 1416994483, 'i': 7} using timestamp_parts.",
+    "reference_sql": "SELECT (bson.main.timestamp_parts({'t': 1416994483, 'i': 7})).i",
+    "ignore_column_names": true
+  },
+  {
+    "name": "timestamp-to-wallclock",
+    "prompt": "Using the bson worker, convert the BSON internal Timestamp struct {'t': 1416994483, 'i': 7} to a TIMESTAMPTZ from its seconds component using timestamp_to_ts.",
+    "reference_sql": "SELECT bson.main.timestamp_to_ts({'t': 1416994483, 'i': 7})",
+    "ignore_column_names": true
+  },
+  {
+    "name": "mongodump-document-count",
+    "prompt": "Using the bson worker's mongodump_read function on the file at the relative path test/data/users.bson, return the single boolean telling whether it contains exactly 3 BSON documents.",
+    "reference_sql": "SELECT count(*) = 3 FROM bson.main.mongodump_read('test/data/users.bson')",
+    "ignore_column_names": true
+  },
+  {
+    "name": "type-registry-lookup",
+    "prompt": "Using the bson worker's bson_types reference view, return the single boolean telling whether the BSON decimal128 type is listed with type byte '0x13'.",
+    "reference_sql": "SELECT type_byte = '0x13' FROM bson.main.bson_types WHERE type_name = 'decimal128'",
     "ignore_column_names": true
   }
 ]"#
@@ -165,6 +344,7 @@ fn catalog_metadata(name: &str) -> CatalogModel {
   {"name": "ObjectId", "description": "Convert ObjectIds between hex and bytes and read their embedded creation time."},
   {"name": "Timestamp", "description": "Read the BSON internal (replication-clock) Timestamp's parts and wall-clock second."},
   {"name": "Streams", "description": "Fan a concatenated length-prefixed BSON stream (mongodump / oplog / GridFS) into rows."},
+  {"name": "Reference", "description": "Static, browsable lookup data such as the BSON element-type registry."},
   {"name": "Diagnostics", "description": "Introspect the running worker, such as its build version."}
 ]"#
                     .to_string(),
@@ -207,7 +387,7 @@ fn catalog_metadata(name: &str) -> CatalogModel {
                         .to_string(),
                 ),
             ],
-            views: Vec::new(),
+            views: vec![bson_types_view()],
             macros: Vec::new(),
             tables: Vec::new(),
         }],

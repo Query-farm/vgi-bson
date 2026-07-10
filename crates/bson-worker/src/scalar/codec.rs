@@ -16,6 +16,15 @@ fn ve(e: impl std::fmt::Display) -> RpcError {
     RpcError::value_error(e.to_string())
 }
 
+/// The closed set of `decode` modes. Single source of truth for both the runtime
+/// validator (`validate_decode_mode`) and the discovery-facing `choices`
+/// constraint on the `mode` argument, so metadata and behaviour cannot drift.
+pub const DECODE_MODES: [&str; 4] = ["auto", "struct", "map", "json"];
+
+/// The closed set of `to_json` Extended-JSON modes, mirroring
+/// `bson_core::extjson::JsonMode::parse`. Sources the `mode` argument's `choices`.
+pub const TO_JSON_MODES: [&str; 2] = ["canonical", "relaxed"];
+
 // --- builders used by the macro-generated scalars -------------------------
 
 fn build_is_valid(rows: &[Option<&[u8]>]) -> Result<ArrayRef> {
@@ -174,12 +183,17 @@ impl ScalarFunction for ToJson {
             "A BSON-encoded BLOB to render as Extended JSON.",
         )];
         if self.with_mode {
-            specs.push(ArgSpec::const_arg(
-                "mode",
-                1,
-                "varchar",
-                "Extended JSON mode: 'canonical' (default, lossless) or 'relaxed' (readable).",
-            ));
+            specs.push(
+                ArgSpec::const_arg(
+                    "mode",
+                    1,
+                    "varchar",
+                    "Extended JSON mode. 'canonical' (the default) is the type-preserving lossless \
+                     form; 'relaxed' renders in-range numbers and dates natively for readability.",
+                )
+                .with_choices(TO_JSON_MODES)
+                .with_default("canonical"),
+            );
         }
         specs
     }
@@ -229,15 +243,23 @@ impl ScalarFunction for Decode {
         let mut tags = crate::meta::object_tags(
             "BSON Decode",
             "Codec",
-            "Decode a BSON document to its richest self-describing form. The optional `mode` is \
-             'auto' (default), 'struct', 'map', or 'json'. NOTE: a DuckDB scalar fixes its output \
-             column type at bind time with no data sample available, so this worker returns \
-             canonical Extended JSON text for every mode (the lossless, stable column type that \
-             preserves ObjectId / Decimal128 / UUID / Timestamp-vs-DateTime). For a typed \
+            "Decode a BSON document to its richest self-describing form and return it as text. \
+             `decode(doc)` is the zero-decisions codec: it always yields canonical MongoDB \
+             Extended JSON v2 — the lossless column that preserves ObjectId, Decimal128, UUID, and \
+             the Timestamp-vs-UTCDateTime distinction — and is exactly equivalent to \
+             `to_json(doc, 'canonical')`. Prefer `to_json` when you want to choose canonical vs \
+             relaxed rendering; reach for `decode` when you just want one stable lossless column \
+             and no mode decision. The optional `mode` ('auto', 'struct', 'map', 'json') is a \
+             forward-looking hint for the output shape you would like, but because a DuckDB scalar \
+             fixes its output column type at bind time with no data sample, all four currently \
+             materialize as the same canonical Extended JSON text — the argument does not yet \
+             change the result, so omit it unless you are signalling intent. For a typed \
              projection of a known shape, cast the JSON or use `field(doc, path, as)` per leaf. \
              Returns NULL for a malformed blob.",
-            "Decode BSON to canonical Extended JSON (the stable lossless column). `mode` ∈ {auto, \
-             struct, map, json} is accepted; all currently return Extended JSON text.",
+            "Decode BSON to its richest self-describing form → canonical Extended JSON (the stable \
+             lossless column). Equivalent to `to_json(doc, 'canonical')`; prefer `to_json` when \
+             you need the canonical/relaxed choice. `mode` ∈ {auto, struct, map, json} is a \
+             forward-looking shape hint that currently always returns the same Extended JSON text.",
             "bson, decode, struct, map, json, extended json, deserialize, objectid, decimal128",
         );
         let example = if self.with_mode {
@@ -266,13 +288,18 @@ impl ScalarFunction for Decode {
             "A BSON-encoded BLOB to decode.",
         )];
         if self.with_mode {
-            specs.push(ArgSpec::const_arg(
-                "mode",
-                1,
-                "varchar",
-                "Decode mode: 'auto' (default), 'struct', 'map', or 'json'. All currently produce \
-                 Extended JSON text (see the function note).",
-            ));
+            specs.push(
+                ArgSpec::const_arg(
+                    "mode",
+                    1,
+                    "varchar",
+                    "Which self-describing form to target when decoding. All modes currently \
+                     materialize as canonical Extended JSON text (see the function note), because a \
+                     DuckDB scalar fixes its output column type at bind time.",
+                )
+                .with_choices(DECODE_MODES)
+                .with_default("auto"),
+            );
         }
         specs
     }
@@ -300,11 +327,14 @@ impl ScalarFunction for Decode {
 }
 
 fn validate_decode_mode(mode: &str) -> Result<()> {
-    match mode.trim().to_ascii_lowercase().as_str() {
-        "auto" | "struct" | "map" | "json" => Ok(()),
-        other => Err(ve(format!(
-            "decode: unknown mode '{other}' (expected auto | struct | map | json)"
-        ))),
+    let normalized = mode.trim().to_ascii_lowercase();
+    if DECODE_MODES.contains(&normalized.as_str()) {
+        Ok(())
+    } else {
+        Err(ve(format!(
+            "decode: unknown mode '{normalized}' (expected {})",
+            DECODE_MODES.join(" | ")
+        )))
     }
 }
 

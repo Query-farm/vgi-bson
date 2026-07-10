@@ -44,12 +44,11 @@ impl TableFunction for BsonSeq {
              concatenated, documents",
         );
         tags.push((
-            "vgi.result_columns_md".into(),
-            "One row per document in the concatenated stream:\n\n\
-             | column | type | description |\n\
-             |---|---|---|\n\
-             | `idx` | BIGINT | Zero-based position in the stream. |\n\
-             | `doc` | BLOB | The bytes of one BSON document. |"
+            "vgi.result_columns_schema".into(),
+            r#"[
+  {"name": "idx", "type": "BIGINT", "description": "Zero-based position of the document within the concatenated stream."},
+  {"name": "doc", "type": "BLOB", "description": "The raw bytes of one framed BSON document, ready to feed to decode / to_json / field."}
+]"#
                 .into(),
         ));
         tags.push((
