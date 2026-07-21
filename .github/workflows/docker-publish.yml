@@ -25,8 +25,16 @@ concurrency:
 
 jobs:
   # Gate every image on the full unit + vgi-extension integration suite, so a
-  # broken worker is never imaged.
+  # broken worker is never imaged. The called ci.yml has an `audit` job that
+  # posts a check-run (rustsec/audit-check@v2 → needs checks: write). A reusable-
+  # workflow caller job cannot grant its callee more than the caller job holds,
+  # and the top-level ceiling here is contents: read — so without this block the
+  # audit job's checks: write escalation is rejected and the whole publish run
+  # fails to start (startup_failure). Grant the scope the callee needs here.
   ci:
+    permissions:
+      contents: read
+      checks: write
     uses: ./.github/workflows/ci.yml
 
   publish:
