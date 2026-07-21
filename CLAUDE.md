@@ -24,7 +24,7 @@ binary DuckDB launches and talks to over Apache Arrow IPC. It decodes/encodes
   - `arrow_io.rs` — Arrow cell readers + nullable column builders + shared STRUCT
     types (`well_formed`, `timestamp_parts`).
   - `value_in.rs` — Arrow cell → `bson::Bson` for the `encode` path.
-  - `scalar/` — `version`, `common` (the `blob_scalar!` macro), `codec`
+  - `scalar/` — `common` (the `blob_scalar!` macro), `codec`
     (decode/to_json/from_json/encode/is_valid/well_formed/keys/field/type_of),
     `objectid`, `timestamp`.
   - `table/` — `seq` (`bson_seq`), `dump` (`mongodump_read`).
@@ -79,5 +79,5 @@ runner at it.
 Bump `[workspace.package] version` in `Cargo.toml`, sync `Cargo.lock`, tag
 `vX.Y.Z`. `release.yml` gates on CI then calls the shared
 `Query-farm/vgi-actions/.github/workflows/rust-release.yml@v1` (asset prefix
-`vgi-bson`, bin `bson-worker`). `bson_version()` must equal the tag
-(`ci/check-version.sh`).
+`vgi-bson`, bin `bson-worker`). The catalog `implementation_version` (built from
+the workspace version) must equal the tag (`ci/check-version.sh`).

@@ -25,6 +25,19 @@ pub const DECODE_MODES: [&str; 4] = ["auto", "struct", "map", "json"];
 /// `bson_core::extjson::JsonMode::parse`. Sources the `mode` argument's `choices`.
 pub const TO_JSON_MODES: [&str; 2] = ["canonical", "relaxed"];
 
+/// The closed set of `field(doc, path, as)` leaf-coercion modes, mirroring the
+/// non-`Infer` arms of `bson_core::field::Coerce::parse`. Sources the `as`
+/// argument's discovery-facing `choices` (omitting the arg, or NULL, infers).
+pub const FIELD_AS_MODES: [&str; 7] = [
+    "objectid",
+    "decimal",
+    "uuid",
+    "timestamp",
+    "datetime",
+    "blob",
+    "json",
+];
+
 // --- builders used by the macro-generated scalars -------------------------
 
 fn build_is_valid(rows: &[Option<&[u8]>]) -> Result<ArrayRef> {
@@ -95,7 +108,7 @@ blob_scalar! {
     description = "Diagnose BSON well-formedness: STRUCT(ok BOOL, error VARCHAR, kind VARCHAR)",
     title = "BSON Well-Formed Diagnosis",
     category = "Validation",
-    doc_llm = "Diagnose a BSON blob and return STRUCT(ok BOOL, error VARCHAR, kind VARCHAR). \
+    doc_llm = "Diagnose a BSON blob and return `STRUCT(ok BOOL, error VARCHAR, kind VARCHAR)`. \
         `kind` is one of truncated, length-mismatch, trailing-bytes, invalid-type, bad-cstring, \
         bad-utf8, duplicate-key, nesting-limit, bad-decimal128, bad-subtype (NULL when ok). \
         Stricter than `is_valid`: it also flags duplicate document keys and trailing bytes. Never \
@@ -118,7 +131,7 @@ blob_scalar! {
     description = "List the top-level field names of a BSON document in document order",
     title = "BSON Keys",
     category = "Projection",
-    doc_llm = "Return the top-level field names of a BSON document as a LIST<VARCHAR>, in document \
+    doc_llm = "Return the top-level field names of a BSON document as a `LIST<VARCHAR>`, in document \
         order (BSON preserves insertion order). Use it to discover the shape of a collection's \
         documents or to drive dynamic projection. Returns NULL for a malformed blob.",
     doc_md = "Top-level field names → `LIST<VARCHAR>` in document order.",
@@ -245,7 +258,7 @@ impl ScalarFunction for Decode {
             "Codec",
             "Decode a BSON document to its richest self-describing form and return it as text. \
              `decode(doc)` is the zero-decisions codec: it always yields canonical MongoDB \
-             Extended JSON v2 — the lossless column that preserves ObjectId, Decimal128, UUID, and \
+             Extended JSON v2 — the lossless column that preserves ObjectId, Decimal128, `UUID`, and \
              the Timestamp-vs-UTCDateTime distinction — and is exactly equivalent to \
              `to_json(doc, 'canonical')`. Prefer `to_json` when you want to choose canonical vs \
              relaxed rendering; reach for `decode` when you just want one stable lossless column \
@@ -412,12 +425,13 @@ impl ScalarFunction for Encode {
         let mut tags = crate::meta::object_tags(
             "BSON Encode",
             "Codec",
-            "Encode a DuckDB value as a BSON document. STRUCT → embedded document; MAP → document; \
-             LIST → array; TIMESTAMP/TIMESTAMPTZ → UTCDateTime; UUID → Binary subtype 0x04; BLOB → \
-             Binary subtype 0x00; integers → Int32/Int64 by range; DOUBLE → Double; DECIMAL → \
-             Decimal128. The top-level value MUST be a document (a STRUCT or MAP) — BSON has no \
-             top-level scalar, so a bare scalar raises an error. Returns NULL for a NULL input.",
-            "Encode a DuckDB STRUCT/MAP as BSON document bytes. The inverse of `decode` / the typed \
+            "Encode a DuckDB value as a BSON document. `STRUCT` → embedded document; `MAP` → \
+             document; `LIST` → array; `TIMESTAMP`/`TIMESTAMPTZ` → UTCDateTime; `UUID` → Binary \
+             subtype 0x04; `BLOB` → Binary subtype 0x00; integers → Int32/Int64 by range; `DOUBLE` \
+             → Double; `DECIMAL` → Decimal128. The top-level value MUST be a document (a `STRUCT` or \
+             `MAP`) — BSON has no top-level scalar, so a bare scalar raises an error. Returns NULL \
+             for a NULL input.",
+            "Encode a DuckDB `STRUCT`/`MAP` as BSON document bytes. The inverse of `decode` / the typed \
              companion of `from_json`.",
             "bson, encode, serialize, struct, map, list, timestamp, uuid, decimal, document",
         );
@@ -478,14 +492,14 @@ impl ScalarFunction for Field {
             "BSON Field Extract",
             "Projection",
             "Extract one field from a BSON document by dotted path ('o._id', 'items.0.sku') \
-             without materializing the whole document, returning a VARCHAR. The optional `as` \
+             without materializing the whole document, returning a `VARCHAR`. The optional `as` \
              argument coerces the leaf to a cast-ready string: 'objectid' → 24-hex, 'decimal' → \
-             the canonical decimal literal (cast with ::DECIMAL(38,4)), 'uuid' → canonical UUID \
-             (cast with ::UUID), 'datetime'/'timestamp' → RFC 3339 (cast with ::TIMESTAMPTZ), \
+             the canonical decimal literal (cast with `::DECIMAL(38,4)`), 'uuid' → canonical `UUID` \
+             (cast with `::UUID`), 'datetime'/'timestamp' → RFC 3339 (cast with `::TIMESTAMPTZ`), \
              'blob' → lowercase hex, 'json' → canonical Extended JSON. With no `as` (or NULL), the \
              leaf is inferred (scalars render bare). A missing path → NULL. Lossless typed \
              projection a naive JSON path would corrupt.",
-            "Extract a field by dotted path → VARCHAR. `as` ∈ {objectid, decimal, uuid, timestamp, \
+            "Extract a field by dotted path → `VARCHAR`. `as` ∈ {objectid, decimal, uuid, timestamp, \
              datetime, blob, json} coerces the leaf to a cast-ready string; NULL infers.",
             "bson, field, path, extract, project, objectid, decimal, uuid, datetime, timestamp, \
              dotted path, typed",
@@ -521,14 +535,17 @@ impl ScalarFunction for Field {
             ),
         ];
         if self.with_as {
-            specs.push(ArgSpec::const_arg(
-                "as",
-                2,
-                "varchar",
-                "How to coerce the extracted leaf into a cast-ready string; see the accepted mode \
-                 values in the function description. Omit (or NULL) to infer the rendering from \
-                 the leaf.",
-            ));
+            specs.push(
+                ArgSpec::const_arg(
+                    "as",
+                    2,
+                    "varchar",
+                    "How to coerce the extracted leaf into a cast-ready string. Omit (or NULL) to \
+                     infer the rendering from the leaf; see the function description for what each \
+                     mode emits and the SQL type to cast the result to.",
+                )
+                .with_choices(FIELD_AS_MODES),
+            );
         }
         specs
     }
@@ -588,7 +605,7 @@ impl ScalarFunction for TypeOf {
              'date', 'binData:uuid', 'binData:generic', 'binData:encrypted', 'minKey', 'int', \
              'long', 'double', 'string', 'object', 'array', … . With no `path` (or NULL) it \
              returns the top-level type ('object'). The binData subtype is surfaced after the \
-             colon, so you can tell a UUID, an encrypted (FLE) blob, or a generic blob apart. A \
+             colon, so you can tell a `UUID`, an encrypted (FLE) blob, or a generic blob apart. A \
              missing path → NULL. Returns NULL for a malformed blob.",
             "BSON type name at a path, e.g. 'objectId', 'decimal128', 'binData:uuid'. NULL path → \
              top-level 'object'.",

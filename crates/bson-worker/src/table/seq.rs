@@ -31,9 +31,9 @@ impl TableFunction for BsonSeq {
         let mut tags = crate::meta::object_tags(
             "BSON Sequence Split",
             "Streams",
-            "Split a BLOB holding N concatenated length-prefixed BSON documents (each is `int32 \
-             length ++ body ++ 0x00`) into one row per document: columns idx (BIGINT, zero-based \
-             position) and doc (BLOB, the single document's bytes). This is exactly the wire shape \
+            "Split a `BLOB` holding N concatenated length-prefixed BSON documents (each is `int32 \
+             length ++ body ++ 0x00`) into one row per document: columns idx (`BIGINT`, zero-based \
+             position) and doc (`BLOB`, the single document's bytes). This is exactly the wire shape \
              of a mongodump `.bson` file body, an oplog batch, or a GridFS reassembly. Stops \
              cleanly at the first malformed length prefix — partial trailing bytes are ignored \
              (never panics). Feed `doc` to decode / to_json / field. Use as a LATERAL table \

@@ -5,14 +5,11 @@ pub mod common;
 pub mod codec;
 pub mod objectid;
 pub mod timestamp;
-pub mod version;
 
 use vgi::Worker;
 
 /// Register every scalar function on the worker.
 pub fn register(worker: &mut Worker) {
-    worker.register_scalar(version::BsonVersion);
-
     // Core codec. Optional-arg functions ship a 1-arg and a 2-arg arity overload
     // because DuckDB binds a const argument as required.
     worker.register_scalar(codec::Decode { with_mode: false });

@@ -109,7 +109,8 @@ All functions live in the `bson.main` schema.
 | `bson_seq(stream BLOB)` | `TABLE(idx BIGINT, doc BLOB)` | Split N concatenated length-prefixed BSON documents (mongodump body / oplog batch / GridFS reassembly) into rows. Stops cleanly at a trailing partial document. |
 | `mongodump_read(glob VARCHAR)` | `TABLE(idx BIGINT, doc BLOB, file VARCHAR)` | Read a local-filesystem glob of `.bson` files and apply `bson_seq` per file. For cloud dumps use `read_blob('s3://…/*.bson') + bson_seq(content)`. |
 
-Plus `bson_version() -> VARCHAR`.
+The worker's build version is published as the catalog `implementation_version`
+(read it via `duckdb_databases().tags`), not as a scalar function.
 
 ## BSON → DuckDB type mapping
 

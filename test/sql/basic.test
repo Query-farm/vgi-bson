@@ -158,8 +158,12 @@ SELECT field(doc, 'name') FROM mongodump_read('test/data/users.bson') WHERE idx 
 bob
 
 # --- version -------------------------------------------------------------
+# The worker build version is published as the catalog implementation_version
+# (no bson_version() scalar; VGI328). The resolved version rides the attached
+# database's tags, surfaced after ATTACH regardless of transport.
 
 query T
-SELECT bson_version() = '0.1.0';
+SELECT map_extract(tags, 'vgi_resolved_implementation_version')[1] = '0.1.0'
+FROM duckdb_databases() WHERE database_name = 'bson';
 ----
 true

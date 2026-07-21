@@ -163,23 +163,22 @@ fn catalog_metadata(name: &str) -> CatalogModel {
                 "vgi.doc_llm".to_string(),
                 "Decode and encode BSON (Binary JSON, bsonspec.org) in SQL with lossless, typed \
                  handling of BSON's rich type zoo — ObjectId, Decimal128, Binary subtypes \
-                 (including UUID 0x04 and encrypted / FLE payloads), the Timestamp-vs-UTCDateTime \
+                 (including `UUID` 0x04 and encrypted / FLE payloads), the Timestamp-vs-UTCDateTime \
                  footgun, Int32 / Int64 / Double, Regex, MinKey / MaxKey, DBPointer, and Code — \
                  plus correct MongoDB Extended JSON v2 in both canonical (type-preserving, \
                  lossless) and relaxed (human-readable) forms. Reach for this worker to put the raw \
                  BSON the live MongoDB connector never sees to work in SQL: mongodump backups, \
                  oplog and change-stream captures, GridFS chunks, and BSON columns already at rest \
                  in the warehouse. Everything runs as pure in-engine scalar and table compute over \
-                 a BLOB column — no network, no state, zero egress — so it is the offline / \
+                 a `BLOB` column — no network, no state, zero egress — so it is the offline / \
                  at-rest complement to a live connection, not a driver. Encrypted (FLE / \
-                 Queryable-Encryption) values stay opaque. Discover the concrete functions by \
-                 listing the schema."
+                 Queryable-Encryption) values stay opaque."
                     .to_string(),
             ),
             (
                 "vgi.doc_md".to_string(),
                 "# bson\n\nDecode and encode **BSON** (Binary JSON, [bsonspec.org](https://bsonspec.org)) \
-                 in SQL, with lossless typed handling of ObjectId, Decimal128, UUID-subtype Binary, \
+                 in SQL, with lossless typed handling of ObjectId, Decimal128, `UUID`-subtype Binary, \
                  and the Timestamp-vs-UTCDateTime footgun — plus correct **MongoDB Extended JSON \
                  v2** (canonical & relaxed). The value is in-engine decode of the raw BSON the live \
                  `mongo` connector never sees: **mongodump backups**, **oplog / change-stream** \
@@ -242,12 +241,6 @@ fn catalog_metadata(name: &str) -> CatalogModel {
     "prompt": "Using the bson worker, split the concatenated BSON byte stream from_hex('05000000000500000000') into one row per contained document and return each document's zero-based index.",
     "reference_sql": "SELECT idx FROM bson.main.bson_seq(from_hex('05000000000500000000'))",
     "unordered": true,
-    "ignore_column_names": true
-  },
-  {
-    "name": "worker-version",
-    "prompt": "Using the bson worker, return the version string reported by its bson_version function.",
-    "reference_sql": "SELECT bson.main.bson_version()",
     "ignore_column_names": true
   },
   {
@@ -315,6 +308,12 @@ fn catalog_metadata(name: &str) -> CatalogModel {
             ),
         ],
         source_url: Some("https://github.com/Query-farm/vgi-bson".to_string()),
+        // The worker's own build version, advertised on the catalog so an agent
+        // reads it from vgi_catalogs() without spending a query (and it cannot
+        // drift from the running binary). Replaces a parameterless version()
+        // scalar (VGI328). Kept in lockstep with the release tag by
+        // ci/check-version.sh.
+        implementation_version: Some(bson_core::version().to_string()),
         schemas: vec![CatSchema {
             name: "main".to_string(),
             comment: Some(
@@ -344,8 +343,7 @@ fn catalog_metadata(name: &str) -> CatalogModel {
   {"name": "ObjectId", "description": "Convert ObjectIds between hex and bytes and read their embedded creation time."},
   {"name": "Timestamp", "description": "Read the BSON internal (replication-clock) Timestamp's parts and wall-clock second."},
   {"name": "Streams", "description": "Fan a concatenated length-prefixed BSON stream (mongodump / oplog / GridFS) into rows."},
-  {"name": "Reference", "description": "Static, browsable lookup data such as the BSON element-type registry."},
-  {"name": "Diagnostics", "description": "Introspect the running worker, such as its build version."}
+  {"name": "Reference", "description": "Static, browsable lookup data such as the BSON element-type registry."}
 ]"#
                     .to_string(),
                 ),
@@ -358,8 +356,9 @@ fn catalog_metadata(name: &str) -> CatalogModel {
                      scan); typed field, type, and shape projection by dotted path; ObjectId and \
                      internal-Timestamp (replication-clock) helpers; and table functions that fan \
                      a concatenated length-prefixed BSON stream — a mongodump file, an oplog \
-                     batch, a GridFS reassembly — into one row per document. List the schema to \
-                     see the individual functions and their signatures."
+                     batch, a GridFS reassembly — into one row per document. The codec round-trips \
+                     canonical Extended JSON byte-for-byte, so it doubles as the migration and \
+                     diff surface for BSON at rest."
                         .to_string(),
                 ),
                 (
@@ -372,19 +371,33 @@ fn catalog_metadata(name: &str) -> CatalogModel {
                      total on hostile input, typed dotted-path **projection**, **ObjectId** and \
                      internal-**Timestamp** helpers, and **stream**-splitting table functions for \
                      mongodump / oplog / GridFS data.\n\n\
-                     List the schema to browse the individual functions and their signatures, or \
-                     use the `vgi.categories` groupings to see where each one fits."
+                     The `vgi.categories` groupings show where each function fits; the codec's \
+                     canonical Extended JSON round-trips byte-for-byte, making it the migration \
+                     and diff surface for BSON at rest."
                         .to_string(),
                 ),
                 (
                     "vgi.example_queries".to_string(),
-                    "SELECT bson.main.to_json(bson.main.from_json('{\"a\":1}'));\n\
-                     SELECT bson.main.to_json(bson.main.from_json('{\"a\":1}'), 'relaxed');\n\
-                     SELECT bson.main.field(bson.main.from_json('{\"o\":{\"sku\":\"abc\"}}'), 'o.sku');\n\
-                     SELECT (bson.main.well_formed(from_hex('0500000000'))).ok;\n\
-                     SELECT bson.main.type_of(bson.main.from_json('{\"a\":1}'));\n\
-                     SELECT idx, octet_length(doc) FROM bson.main.bson_seq(from_hex('05000000000500000000'));"
+                    r#"[
+  {"description": "Render a BSON document as canonical (lossless) Extended JSON v2.", "sql": "SELECT bson.main.to_json(bson.main.from_json('{\"a\":1}'))"},
+  {"description": "Render the same document as relaxed, human-readable Extended JSON.", "sql": "SELECT bson.main.to_json(bson.main.from_json('{\"a\":1}'), 'relaxed')"},
+  {"description": "Extract a nested leaf by dotted path without decoding the whole document.", "sql": "SELECT bson.main.field(bson.main.from_json('{\"o\":{\"sku\":\"abc\"}}'), 'o.sku')"},
+  {"description": "Check that a tiny empty document is structurally well-formed.", "sql": "SELECT (bson.main.well_formed(from_hex('0500000000'))).ok"},
+  {"description": "Report the top-level BSON type name of a document.", "sql": "SELECT bson.main.type_of(bson.main.from_json('{\"a\":1}'))"},
+  {"description": "Fan a concatenated BSON stream into one row per document with its byte length.", "sql": "SELECT idx, octet_length(doc) AS n FROM bson.main.bson_seq(from_hex('05000000000500000000')) ORDER BY idx"}
+]"#
                         .to_string(),
+                ),
+                (
+                    // At least one guaranteed-runnable, verified example (VGI509).
+                    // Both assert a deterministic boolean, independent of exact
+                    // Extended-JSON spacing, so they stay stable across builds.
+                    "vgi.executable_examples".to_string(),
+                    r#"[
+  {"description": "Canonical Extended JSON round-trips BSON byte-for-byte (the migration guarantee).", "sql": "SELECT bson.main.from_json(bson.main.to_json(bson.main.from_json('{\"a\":1}'))) = bson.main.from_json('{\"a\":1}') AS roundtrips", "expected_result": [{"roundtrips": true}]},
+  {"description": "A minimal empty document (05 00 00 00 00) is well-formed.", "sql": "SELECT (bson.main.well_formed(from_hex('0500000000'))).ok AS ok", "expected_result": [{"ok": true}]}
+]"#
+                    .to_string(),
                 ),
             ],
             views: vec![bson_types_view()],

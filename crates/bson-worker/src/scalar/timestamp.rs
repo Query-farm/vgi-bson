@@ -32,12 +32,12 @@ impl ScalarFunction for TimestampToTs {
         let mut tags = crate::meta::object_tags(
             "BSON Timestamp → TIMESTAMPTZ",
             "Timestamp",
-            "Convert a BSON internal Timestamp (the decoded STRUCT(t, i) replication clock) to a \
-             second-resolution TIMESTAMPTZ from its `t` (seconds-since-epoch) component — the \
+            "Convert a BSON internal Timestamp (the decoded `STRUCT(t, i)` replication clock) to a \
+             second-resolution `TIMESTAMPTZ` from its `t` (seconds-since-epoch) component — the \
              oplog ordering clock. NOTE this is the MongoDB-internal 0x11 Timestamp, NOT the \
              user-facing 0x09 UTCDateTime: a 0x11 value is a replication marker, not a wall-clock \
              time. Returns NULL when the input struct has no integer `t`.",
-            "BSON Timestamp STRUCT(t,i) → TIMESTAMPTZ from the `t` seconds (the oplog clock).",
+            "BSON Timestamp `STRUCT(t,i)` → `TIMESTAMPTZ` from the `t` seconds (the oplog clock).",
             "bson, timestamp, oplog, replication, ts, to_ts, clock, 0x11, increment",
         );
         tags.push((
@@ -85,11 +85,11 @@ impl ScalarFunction for TimestampParts {
         let mut tags = crate::meta::object_tags(
             "BSON Timestamp Parts",
             "Timestamp",
-            "Normalize a BSON internal Timestamp to STRUCT(t UINTEGER, i UINTEGER) — the raw \
+            "Normalize a BSON internal Timestamp to `STRUCT(t UINTEGER, i UINTEGER)` — the raw \
              (time-in-seconds, increment) pair of the 0x11 replication clock. `t` orders ops to \
              the second; `i` breaks ties within the same second. Use timestamp_to_ts for a \
-             TIMESTAMPTZ from `t`. Returns a NULL struct for a NULL input.",
-            "BSON Timestamp → STRUCT(t UINTEGER, i UINTEGER): the raw (seconds, increment) pair.",
+             `TIMESTAMPTZ` from `t`. Returns a NULL struct for a NULL input.",
+            "BSON Timestamp → `STRUCT(t UINTEGER, i UINTEGER)`: the raw (seconds, increment) pair.",
             "bson, timestamp, parts, increment, time, oplog, replication, 0x11, t, i",
         );
         tags.push((

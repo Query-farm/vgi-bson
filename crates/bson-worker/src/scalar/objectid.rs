@@ -23,13 +23,13 @@ impl ScalarFunction for ObjectIdTimestamp {
         let mut tags = crate::meta::object_tags(
             "ObjectId Embedded Timestamp",
             "ObjectId",
-            "Return the creation time embedded in an ObjectId as a TIMESTAMPTZ — the first 4 bytes \
+            "Return the creation time embedded in an ObjectId as a `TIMESTAMPTZ` — the first 4 bytes \
              of every ObjectId are the seconds since the Unix epoch. Accepts either a 24-char hex \
-             VARCHAR or a 12-byte BLOB. This is the cheap \"when was this document first written\" \
+             `VARCHAR` or a 12-byte `BLOB`. This is the cheap \"when was this document first written\" \
              probe — no separate createdAt field needed. Returns NULL for a value that is not a \
              valid ObjectId.",
-            "Creation time embedded in an ObjectId → TIMESTAMPTZ. Accepts 24-hex VARCHAR or 12-byte \
-             BLOB.",
+            "Creation time embedded in an ObjectId → `TIMESTAMPTZ`. Accepts 24-hex `VARCHAR` or 12-byte \
+             `BLOB`.",
             "bson, objectid, timestamp, created, creation time, oid, embedded, when written",
         );
         tags.push((
@@ -88,9 +88,9 @@ impl ScalarFunction for ObjectIdHex {
         let mut tags = crate::meta::object_tags(
             "ObjectId to Hex",
             "ObjectId",
-            "Convert a 12-byte ObjectId BLOB to its 24-char lowercase hexadecimal string. Returns \
+            "Convert a 12-byte ObjectId `BLOB` to its 24-char lowercase hexadecimal string. Returns \
              NULL when the input is not exactly 12 bytes. The inverse of objectid_from_hex.",
-            "12-byte ObjectId BLOB → 24-char hex VARCHAR.",
+            "12-byte ObjectId `BLOB` → 24-char hex `VARCHAR`.",
             "bson, objectid, hex, oid, to hex, bytes to hex, encode",
         );
         tags.push((
@@ -138,9 +138,9 @@ impl ScalarFunction for ObjectIdFromHex {
         let mut tags = crate::meta::object_tags(
             "Parse an ObjectId Hex String to Bytes",
             "ObjectId",
-            "Convert a 24-char hexadecimal ObjectId string to its 12-byte BLOB form. Returns NULL \
+            "Convert a 24-char hexadecimal ObjectId string to its 12-byte `BLOB` form. Returns NULL \
              for a string that is not a valid 24-char ObjectId. The inverse of objectid_hex.",
-            "24-char hex VARCHAR → 12-byte ObjectId BLOB.",
+            "24-char hex `VARCHAR` → 12-byte ObjectId `BLOB`.",
             "bson, objectid, hex, oid, from hex, hex to bytes, decode",
         );
         tags.push((

@@ -39,8 +39,8 @@ impl TableFunction for MongodumpRead {
             "Read mongodump .bson Files",
             "Streams",
             "Read a glob of mongodump `.bson` files (each a concatenation of length-prefixed BSON \
-             documents) and fan them into one row per document: columns idx (BIGINT, per-file \
-             zero-based position), doc (BLOB, one document), and file (VARCHAR, the source path). \
+             documents) and fan them into one row per document: columns idx (`BIGINT`, per-file \
+             zero-based position), doc (`BLOB`, one document), and file (`VARCHAR`, the source path). \
              Point it at a backup directory (e.g. '/backups/mydb/*.bson') to get every document \
              joinable in SQL, then feed `doc` to decode / to_json / field. Stops cleanly at any \
              trailing partial document. v1 reads local-filesystem globs; for cloud dumps use \
