@@ -7,13 +7,15 @@ license.workspace = true
 authors.workspace = true
 description = "VGI worker exposing BSON decode / Extended-JSON / typed-field functions to DuckDB over Apache Arrow"
 
+[lib]
+name = "bson_worker"
+path = "src/lib.rs"
+
 [[bin]]
 name = "bson-worker"
 path = "src/main.rs"
 
 [dependencies]
-vgi.workspace = true
-vgi-rpc.workspace = true
 arrow-array.workspace = true
 arrow-buffer.workspace = true
 arrow-schema.workspace = true
@@ -22,9 +24,23 @@ bson-core.workspace = true
 # Arrow cells. Same version the core crate resolves, so no duplicate-tree concern.
 bson = { version = "3.1.0", default-features = false, features = ["compat-3-0-0", "serde", "serde_json-1"] }
 log = "0.4"
-env_logger = "0.11"
 # Local-filesystem glob expansion for `mongodump_read`.
 glob = "0.3"
+
+# --- Native ---------------------------------------------------------------
+# The SDK's real default features (`sqlite` + `transport-http`) plus the HTTP
+# RPC codec and env_logger — unchanged from before the wasm split.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+vgi = { workspace = true, features = ["sqlite", "transport-http"] }
+vgi-rpc = { workspace = true, features = ["http"] }
+env_logger = "0.11"
+
+# --- wasm32 ---------------------------------------------------------------
+# No sqlite (C) and no HTTP transport (tokio/mio/axum); the bincode stream codec
+# is what the SAB byte-channel transport needs. No env_logger.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+vgi = { workspace = true }
+vgi-rpc = { workspace = true, features = ["stream-codec"] }
 
 [dev-dependencies]
 bson-core = { workspace = true }
