@@ -115,4 +115,8 @@ impl TableProducer for SeqProducer {
                 .map_err(|e| RpcError::runtime_error(e.to_string()))?,
         ))
     }
+    fn resume_supported(&self) -> bool {
+        // Single batch: the whole stream is split at producer() time, so there is no cursor to resume.
+        false
+    }
 }

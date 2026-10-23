@@ -212,101 +212,69 @@ fn catalog_metadata(name: &str) -> CatalogModel {
             (
                 "vgi.agent_test_tasks".to_string(),
                 // Deterministic, self-contained analyst tasks for `vgi-lint simulate`
-                // (VGI152/VGI920). Each reference query builds its own BSON from a
-                // literal (from_json / from_hex) so there is no external-file or
-                // ordering dependency; `ignore_column_names` lets the analyst pick any
-                // alias, and `unordered` frees the row order of the stream-split task.
+                // (VGI152/VGI920). Only name + prompt are published; the graders
+                // (reference_sql, ignore_column_names, unordered) live in
+                // vgi-agent-tests.yaml at the repo root, keyed by task name (VGI416).
                 r#"[
   {
     "name": "json-roundtrip",
-    "prompt": "Using the bson worker, confirm that the BSON encoding of the JSON document {\"a\":1} round-trips losslessly: rendering it to canonical MongoDB Extended JSON with to_json and parsing that back with from_json must reproduce the original BSON bytes. Return the single boolean result.",
-    "reference_sql": "SELECT bson.main.from_json(bson.main.to_json(bson.main.from_json('{\"a\":1}'))) = bson.main.from_json('{\"a\":1}')",
-    "ignore_column_names": true
+    "prompt": "Using the bson worker, confirm that the BSON encoding of the JSON document {\"a\":1} round-trips losslessly: rendering it to canonical MongoDB Extended JSON with to_json and parsing that back with from_json must reproduce the original BSON bytes. Return the single boolean result."
   },
   {
     "name": "field-extract",
-    "prompt": "Using the bson worker, extract the value at the dotted path o.sku from the BSON encoding of the JSON document {\"o\":{\"sku\":\"abc\"}}.",
-    "reference_sql": "SELECT bson.main.field(bson.main.from_json('{\"o\":{\"sku\":\"abc\"}}'), 'o.sku')",
-    "ignore_column_names": true
+    "prompt": "Using the bson worker, extract the value at the dotted path o.sku from the BSON encoding of the JSON document {\"o\":{\"sku\":\"abc\"}}."
   },
   {
     "name": "objectid-created-time",
-    "prompt": "Using the bson worker, return the creation time embedded in the ObjectId whose hexadecimal string is 54759eb3c090d83494e2d804.",
-    "reference_sql": "SELECT bson.main.objectid_timestamp('54759eb3c090d83494e2d804')",
-    "ignore_column_names": true
+    "prompt": "Using the bson worker, return the creation time embedded in the ObjectId whose hexadecimal string is 54759eb3c090d83494e2d804."
   },
   {
     "name": "validate-document",
-    "prompt": "Using the bson worker's is_valid function, return the single boolean telling whether the bytes produced by from_hex('0500000000') are exactly one well-formed BSON document.",
-    "reference_sql": "SELECT bson.main.is_valid(from_hex('0500000000'))",
-    "ignore_column_names": true
+    "prompt": "Using the bson worker's is_valid function, return the single boolean telling whether the bytes produced by from_hex('0500000000') are exactly one well-formed BSON document."
   },
   {
     "name": "split-stream",
-    "prompt": "Using the bson worker, split the concatenated BSON byte stream from_hex('05000000000500000000') into one row per contained document and return each document's zero-based index.",
-    "reference_sql": "SELECT idx FROM bson.main.bson_seq(from_hex('05000000000500000000'))",
-    "unordered": true,
-    "ignore_column_names": true
+    "prompt": "Using the bson worker, split the concatenated BSON byte stream from_hex('05000000000500000000') into one row per contained document and return each document's zero-based index."
   },
   {
     "name": "decode-to-extjson",
-    "prompt": "Using the bson worker, confirm that decode and to_json agree on the BSON encoding of {\"a\":1}: decode of those bytes must equal to_json of the same bytes in canonical mode. Return the single boolean result.",
-    "reference_sql": "SELECT bson.main.decode(bson.main.from_json('{\"a\":1}')) = bson.main.to_json(bson.main.from_json('{\"a\":1}'), 'canonical')",
-    "ignore_column_names": true
+    "prompt": "Using the bson worker, confirm that decode and to_json agree on the BSON encoding of {\"a\":1}: decode of those bytes must equal to_json of the same bytes in canonical mode. Return the single boolean result."
   },
   {
     "name": "encode-struct",
-    "prompt": "Using the bson worker, encode the DuckDB struct {'a': 1} to BSON bytes with the encode function and return the result as an uppercase hexadecimal string.",
-    "reference_sql": "SELECT to_hex(bson.main.encode({'a': 1}))",
-    "ignore_column_names": true
+    "prompt": "Using the bson worker, encode the DuckDB struct {'a': 1} to BSON bytes with the encode function and return the result as an uppercase hexadecimal string."
   },
   {
     "name": "list-top-level-keys",
-    "prompt": "Using the bson worker, list the top-level field names, in document order, of the BSON encoding of the JSON document {\"z\":1,\"a\":2,\"m\":3}.",
-    "reference_sql": "SELECT bson.main.keys(bson.main.from_json('{\"z\":1,\"a\":2,\"m\":3}'))",
-    "ignore_column_names": true
+    "prompt": "Using the bson worker, list the top-level field names, in document order, of the BSON encoding of the JSON document {\"z\":1,\"a\":2,\"m\":3}."
   },
   {
     "name": "type-name-at-path",
-    "prompt": "Using the bson worker, report the BSON type name at the field path _id of the document {\"_id\":{\"$oid\":\"54759eb3c090d83494e2d804\"}} encoded with from_json.",
-    "reference_sql": "SELECT bson.main.type_of(bson.main.from_json('{\"_id\":{\"$oid\":\"54759eb3c090d83494e2d804\"}}'), '_id')",
-    "ignore_column_names": true
+    "prompt": "Using the bson worker, report the BSON type name at the field path _id of the document {\"_id\":{\"$oid\":\"54759eb3c090d83494e2d804\"}} encoded with from_json."
   },
   {
     "name": "diagnose-truncated",
-    "prompt": "Using the bson worker's well_formed function, return the single boolean telling whether the failure kind it reports for the malformed bytes from_hex('0c00000010610001') is 'truncated'.",
-    "reference_sql": "SELECT (bson.main.well_formed(from_hex('0c00000010610001'))).kind = 'truncated'",
-    "ignore_column_names": true
+    "prompt": "Using the bson worker's well_formed function, return the single boolean telling whether the failure kind it reports for the malformed bytes from_hex('0c00000010610001') is 'truncated'."
   },
   {
     "name": "objectid-hex-roundtrip",
-    "prompt": "Using the bson worker, convert the ObjectId hex string 54759eb3c090d83494e2d804 to its 12 raw bytes with objectid_from_hex and then back to a hex string with objectid_hex; return that hex string.",
-    "reference_sql": "SELECT bson.main.objectid_hex(bson.main.objectid_from_hex('54759eb3c090d83494e2d804'))",
-    "ignore_column_names": true
+    "prompt": "Using the bson worker, convert the ObjectId hex string 54759eb3c090d83494e2d804 to its 12 raw bytes with objectid_from_hex and then back to a hex string with objectid_hex; return that hex string."
   },
   {
     "name": "timestamp-increment",
-    "prompt": "Using the bson worker, read the increment (i) component from the BSON internal Timestamp struct {'t': 1416994483, 'i': 7} using timestamp_parts.",
-    "reference_sql": "SELECT (bson.main.timestamp_parts({'t': 1416994483, 'i': 7})).i",
-    "ignore_column_names": true
+    "prompt": "Using the bson worker, read the increment (i) component from the BSON internal Timestamp struct {'t': 1416994483, 'i': 7} using timestamp_parts."
   },
   {
     "name": "timestamp-to-wallclock",
-    "prompt": "Using the bson worker, convert the BSON internal Timestamp struct {'t': 1416994483, 'i': 7} to a TIMESTAMPTZ from its seconds component using timestamp_to_ts.",
-    "reference_sql": "SELECT bson.main.timestamp_to_ts({'t': 1416994483, 'i': 7})",
-    "ignore_column_names": true
+    "prompt": "Using the bson worker, convert the BSON internal Timestamp struct {'t': 1416994483, 'i': 7} to a TIMESTAMPTZ from its seconds component using timestamp_to_ts."
   },
   {
     "name": "mongodump-document-count",
-    "prompt": "Using the bson worker's mongodump_read function on the file at the relative path test/data/users.bson, return the single boolean telling whether it contains exactly 3 BSON documents.",
-    "reference_sql": "SELECT count(*) = 3 FROM bson.main.mongodump_read('test/data/users.bson')",
-    "ignore_column_names": true
+    "prompt": "Using the bson worker's mongodump_read function on the file at the relative path test/data/users.bson, return the single boolean telling whether it contains exactly 3 BSON documents."
   },
   {
     "name": "type-registry-lookup",
-    "prompt": "Using the bson worker's bson_types reference view, return the single boolean telling whether the BSON decimal128 type is listed with type byte '0x13'.",
-    "reference_sql": "SELECT type_byte = '0x13' FROM bson.main.bson_types WHERE type_name = 'decimal128'",
-    "ignore_column_names": true
+    "prompt": "Using the bson worker's bson_types reference view, return the single boolean telling whether the BSON decimal128 type is listed with type byte '0x13'."
   }
 ]"#
                 .to_string(),
@@ -321,6 +289,7 @@ fn catalog_metadata(name: &str) -> CatalogModel {
         implementation_version: Some(bson_core::version().to_string()),
         schemas: vec![CatSchema {
             name: "main".to_string(),
+            path: Vec::new(),
             comment: Some(
                 "BSON decode / encode, Extended JSON v2, typed field extraction, and \
                  mongodump/oplog/GridFS stream splitting."

@@ -1,0 +1,58 @@
+# Private graders for the agent-suitability suite (`vgi-lint simulate`).
+#
+# The prompts are published in the catalog's vgi.agent_test_tasks tag
+# (crates/bson-worker/src/lib.rs); the answers live here, keyed by task name,
+# so the agent being graded never sees them. vgi-lint discovers this file in
+# the directory it runs from.
+# Each reference query builds its own BSON from a literal (from_json / from_hex)
+# so there is no external-file or ordering dependency; ignore_column_names lets
+# the analyst pick any alias, and unordered frees the row order of the
+# stream-split task.
+
+tasks:
+  - name: "json-roundtrip"
+    reference_sql: "SELECT bson.main.from_json(bson.main.to_json(bson.main.from_json('{\"a\":1}'))) = bson.main.from_json('{\"a\":1}')"
+    ignore_column_names: true
+  - name: "field-extract"
+    reference_sql: "SELECT bson.main.field(bson.main.from_json('{\"o\":{\"sku\":\"abc\"}}'), 'o.sku')"
+    ignore_column_names: true
+  - name: "objectid-created-time"
+    reference_sql: "SELECT bson.main.objectid_timestamp('54759eb3c090d83494e2d804')"
+    ignore_column_names: true
+  - name: "validate-document"
+    reference_sql: "SELECT bson.main.is_valid(from_hex('0500000000'))"
+    ignore_column_names: true
+  - name: "split-stream"
+    reference_sql: "SELECT idx FROM bson.main.bson_seq(from_hex('05000000000500000000'))"
+    unordered: true
+    ignore_column_names: true
+  - name: "decode-to-extjson"
+    reference_sql: "SELECT bson.main.decode(bson.main.from_json('{\"a\":1}')) = bson.main.to_json(bson.main.from_json('{\"a\":1}'), 'canonical')"
+    ignore_column_names: true
+  - name: "encode-struct"
+    reference_sql: "SELECT to_hex(bson.main.encode({'a': 1}))"
+    ignore_column_names: true
+  - name: "list-top-level-keys"
+    reference_sql: "SELECT bson.main.keys(bson.main.from_json('{\"z\":1,\"a\":2,\"m\":3}'))"
+    ignore_column_names: true
+  - name: "type-name-at-path"
+    reference_sql: "SELECT bson.main.type_of(bson.main.from_json('{\"_id\":{\"$oid\":\"54759eb3c090d83494e2d804\"}}'), '_id')"
+    ignore_column_names: true
+  - name: "diagnose-truncated"
+    reference_sql: "SELECT (bson.main.well_formed(from_hex('0c00000010610001'))).kind = 'truncated'"
+    ignore_column_names: true
+  - name: "objectid-hex-roundtrip"
+    reference_sql: "SELECT bson.main.objectid_hex(bson.main.objectid_from_hex('54759eb3c090d83494e2d804'))"
+    ignore_column_names: true
+  - name: "timestamp-increment"
+    reference_sql: "SELECT (bson.main.timestamp_parts({'t': 1416994483, 'i': 7})).i"
+    ignore_column_names: true
+  - name: "timestamp-to-wallclock"
+    reference_sql: "SELECT bson.main.timestamp_to_ts({'t': 1416994483, 'i': 7})"
+    ignore_column_names: true
+  - name: "mongodump-document-count"
+    reference_sql: "SELECT count(*) = 3 FROM bson.main.mongodump_read('test/data/users.bson')"
+    ignore_column_names: true
+  - name: "type-registry-lookup"
+    reference_sql: "SELECT type_byte = '0x13' FROM bson.main.bson_types WHERE type_name = 'decimal128'"
+    ignore_column_names: true

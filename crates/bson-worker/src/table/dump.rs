@@ -154,4 +154,8 @@ impl TableProducer for DumpProducer {
                 .map_err(|e| RpcError::runtime_error(e.to_string()))?,
         ))
     }
+    fn resume_supported(&self) -> bool {
+        // Single batch: every file is read in one next_batch() call, so there is no cursor to resume.
+        false
+    }
 }
