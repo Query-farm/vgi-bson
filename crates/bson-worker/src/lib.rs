@@ -136,6 +136,7 @@ fn bson_types_view() -> CatView {
                 "[{\"description\":\"List the temporal BSON types and their Extended JSON wrappers.\",\"sql\":\"SELECT type_name, type_byte, extjson_wrapper FROM bson.main.bson_types WHERE type_class = 'temporal' ORDER BY type_name\"}]".to_string(),
             ),
         ],
+        ..Default::default()
     }
 }
 

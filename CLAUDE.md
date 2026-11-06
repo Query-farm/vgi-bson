@@ -42,7 +42,7 @@ binary DuckDB launches and talks to over Apache Arrow IPC. It decodes/encodes
   fixed-schema results (`well_formed`, `timestamp_parts`).
 - **Optional-arg scalars ship two arity overloads** (`with_mode`/`with_as`/
   `with_path`), because DuckDB binds a const argument as required.
-- **Published deps only** — `vgi = "0.46"` (with `vgi-rpc = "0.32"`), arrow 60, `bson = "3.1"` (features
+- **Published deps only** — `vgi = "0.49.2"` (with `vgi-rpc = "0.32.3"`), arrow 59, `bson = "3.1"` (features
   `compat-3-0-0`, `serde`, `serde_json-1`). The `serde_json` `preserve_order`
   feature is load-bearing: it keeps document field order through the
   Extended-JSON parse so `from_json ∘ to_json('canonical')` is byte-identical
@@ -63,7 +63,7 @@ RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --workspace
 ./run_tests.sh        # haybarn SQLLogic E2E (LOAD vgi; ATTACH; assert examples)
 ```
 
-`vgi-lint` runs in CI via `Query-farm/vgi-lint-check@v1` against the release
+`vgi-lint` runs in CI via `Query-farm/vgi-lint-check@v2` against the release
 binary.
 
 ## E2E
