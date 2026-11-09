@@ -163,7 +163,7 @@ bob
 # database's tags, surfaced after ATTACH regardless of transport.
 
 query T
-SELECT map_extract(tags, 'vgi_resolved_implementation_version')[1] = '0.2.1'
+SELECT map_extract(tags, 'vgi_resolved_implementation_version')[1] = '0.3.0'
 FROM duckdb_databases() WHERE database_name = 'bson';
 ----
 true
