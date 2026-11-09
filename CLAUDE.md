@@ -42,7 +42,7 @@ binary DuckDB launches and talks to over Apache Arrow IPC. It decodes/encodes
   fixed-schema results (`well_formed`, `timestamp_parts`).
 - **Optional-arg scalars ship two arity overloads** (`with_mode`/`with_as`/
   `with_path`), because DuckDB binds a const argument as required.
-- **Published deps only** — `vgi = "0.49.2"` (with `vgi-rpc = "0.32.3"`), arrow 59, `bson = "3.1"` (features
+- **Published deps only** — `vgi = "0.50.0"` (with `vgi-rpc = "0.32.3"`), arrow 59, `bson = "3.1"` (features
   `compat-3-0-0`, `serde`, `serde_json-1`). The `serde_json` `preserve_order`
   feature is load-bearing: it keeps document field order through the
   Extended-JSON parse so `from_json ∘ to_json('canonical')` is byte-identical
