@@ -152,9 +152,12 @@ fn catalog_metadata(name: &str) -> CatalogModel {
                 .to_string(),
         ),
         tags: vec![
+            ("vgi.title".to_string(), "BSON Codec".to_string()),
             (
-                "vgi.title".to_string(),
-                "BSON Decode / Extended JSON / Typed Field Codec".to_string(),
+                "vgi.subtitle".to_string(),
+                "Decode, encode, and inspect MongoDB BSON, from Extended JSON to mongodump, \
+                 oplog, and GridFS streams."
+                    .to_string(),
             ),
             (
                 "vgi.keywords".to_string(),
@@ -297,7 +300,7 @@ fn catalog_metadata(name: &str) -> CatalogModel {
                     .to_string(),
             ),
             tags: vec![
-                ("vgi.title".to_string(), "BSON — main".to_string()),
+                ("vgi.title".to_string(), "BSON Functions".to_string()),
                 (
                     "vgi.keywords".to_string(),
                     meta::keywords_json(

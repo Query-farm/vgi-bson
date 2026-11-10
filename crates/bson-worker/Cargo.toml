@@ -28,10 +28,15 @@ log = "0.4"
 glob = "0.3"
 
 # --- Native ---------------------------------------------------------------
-# The SDK's real default features (`sqlite` + `transport-http`) plus the HTTP
-# RPC codec and env_logger — unchanged from before the wasm split.
+# The SDK's HTTP transport plus the HTTP RPC codec and env_logger. The SDK's
+# `sqlite` feature (bundled C SQLite, the default shared-storage backend) is
+# deliberately left off: every function here is a stateless BLOB transform, so
+# the SDK's dependency-free filesystem store (`FsStorage`) covers the little
+# cross-process state the transport needs, and the worker no longer ships a
+# bundled SQLite (RUSTSEC-2026-0459 affects libsqlite3-sys 0.37, which the
+# SDK's rusqlite 0.39 pins).
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-vgi = { workspace = true, features = ["sqlite", "transport-http"] }
+vgi = { workspace = true, features = ["transport-http"] }
 vgi-rpc = { workspace = true, features = ["http"] }
 env_logger = "0.11"
 

@@ -19,10 +19,11 @@ repository = "https://github.com/Query-farm/vgi-bson"
 # VGI Rust SDK (worker side), published on crates.io. 0.24+ provides the wasm
 # `vgi::wasm_worker!` macro used by bson-wasm; requires rustc 1.97 (see
 # rust-version above). Base (feature-less) so each target opts in: the native
-# build takes the SDK's real defaults (`sqlite` + `transport-http`), while the
-# wasm build must NOT — tokio/mio/axum and bundled SQLite do not compile for
-# wasm32, and the browser transport serves over a byte channel. Features are
-# additive and the two are behind mutually-exclusive target cfgs.
+# build takes `transport-http` (but not the SDK's bundled-SQLite `sqlite`
+# storage feature; see crates/bson-worker/Cargo.toml), while the wasm build
+# must NOT — tokio/mio/axum do not compile for wasm32, and the browser
+# transport serves over a byte channel. Features are additive and the two are
+# behind mutually-exclusive target cfgs.
 vgi = { version = "0.50.0", default-features = false }
 vgi-rpc = { version = "0.32.3", default-features = false, features = ["macros"] }
 arrow-array = "59.2"
