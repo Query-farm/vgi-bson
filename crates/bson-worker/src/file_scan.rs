@@ -9,7 +9,7 @@ use arrow_array::{ArrayRef, OffsetSizeTrait, RecordBatch};
 use arrow_schema::{DataType, SchemaRef};
 use bson_core::seq::{DocumentReader, StreamErrorKind};
 use bson_core::validate;
-use vgi::table_function::TableProducer;
+use vgi::table_function::{decode_resume_state, encode_resume_state, TableProducer};
 use vgi_rpc::{OutputCollector, Result, RpcError};
 
 const BATCH_ROWS: usize = 2048;
@@ -18,18 +18,23 @@ const BATCH_BYTES: usize = 8 * 1024 * 1024;
 struct OpenFile {
     path: String,
     reader: DocumentReader<BufReader<File>>,
-    idx: i64,
 }
 
 struct Row {
     idx: i64,
     doc: Vec<u8>,
     file: String,
+    end: u64,
 }
 
 pub(crate) struct FileScan {
     schema: SchemaRef,
-    files: std::vec::IntoIter<String>,
+    files: Vec<String>,
+    // Position of the next unconsumed row, not the reader's lookahead position.
+    file_index: usize,
+    offset: u64,
+    idx: i64,
+    invalid_resume: bool,
     current: Option<OpenFile>,
     pending: Option<Row>,
     strict: bool,
@@ -62,7 +67,11 @@ impl FileScan {
     ) -> Self {
         Self {
             schema,
-            files: files.into_iter(),
+            files,
+            file_index: 0,
+            offset: 0,
+            idx: 0,
+            invalid_resume: false,
             current: None,
             pending: None,
             strict,
@@ -72,20 +81,26 @@ impl FileScan {
     }
 
     fn next_row(&mut self) -> Result<Option<Row>> {
+        if self.invalid_resume {
+            return Err(RpcError::runtime_error("invalid BSON scan continuation"));
+        }
         if let Some(row) = self.pending.take() {
             return Ok(Some(row));
         }
         loop {
             if self.current.is_none() {
-                let Some(path) = self.files.next() else {
+                let Some(path) = self.files.get(self.file_index) else {
                     return Ok(None);
                 };
-                let file = File::open(&path)
+                let file = File::open(path)
                     .map_err(|e| RpcError::runtime_error(format!("read {path}: {e}")))?;
+                let mut reader = DocumentReader::new(BufReader::new(file), self.max_document_size);
+                reader
+                    .seek_to(self.offset)
+                    .map_err(|e| RpcError::runtime_error(format!("seek {path}: {e}")))?;
                 self.current = Some(OpenFile {
-                    path,
-                    reader: DocumentReader::new(BufReader::new(file), self.max_document_size),
-                    idx: 0,
+                    path: path.clone(),
+                    reader,
                 });
             }
             let current = self.current.as_mut().expect("opened above");
@@ -102,14 +117,14 @@ impl FileScan {
                         })?;
                     }
                     let row = Row {
-                        idx: current.idx,
+                        idx: self.idx,
                         doc,
                         file: current.path.clone(),
+                        end: current.reader.offset(),
                     };
-                    current.idx += 1;
                     return Ok(Some(row));
                 }
-                Ok(None) => self.current = None,
+                Ok(None) => self.advance_file(),
                 Err(e) => {
                     // Preserve mongodump_read's historical stop-at-corruption behavior,
                     // but never suppress an actual filesystem I/O error.
@@ -119,10 +134,17 @@ impl FileScan {
                             current.path
                         )));
                     }
-                    self.current = None;
+                    self.advance_file();
                 }
             }
         }
+    }
+
+    fn advance_file(&mut self) {
+        self.current = None;
+        self.file_index += 1;
+        self.offset = 0;
+        self.idx = 0;
     }
 
     fn batch<O: OffsetSizeTrait>(&mut self) -> Result<Option<RecordBatch>> {
@@ -140,6 +162,8 @@ impl FileScan {
                 break;
             }
             docs.append_value(&row.doc);
+            self.offset = row.end;
+            self.idx = row.idx + 1;
             bytes += row.doc.len();
             rows += 1;
             if self.with_provenance {
@@ -174,7 +198,30 @@ impl TableProducer for FileScan {
     }
 
     fn resume_supported(&self) -> bool {
-        false
+        true
+    }
+
+    fn encode_resume(&self) -> Vec<u8> {
+        // Carry the original glob expansion and next unread position. Never put
+        // a potentially huge lookahead document or an OS handle in the token.
+        encode_resume_state(&(&self.files, self.file_index, self.offset, self.idx))
+    }
+
+    fn restore_resume(&mut self, bytes: &[u8]) {
+        self.current = None;
+        self.pending = None;
+        self.invalid_resume = true;
+        if let Some((files, file_index, offset, idx)) =
+            decode_resume_state::<(Vec<String>, usize, u64, i64)>(bytes)
+        {
+            if file_index <= files.len() && idx >= 0 {
+                self.files = files;
+                self.file_index = file_index;
+                self.offset = offset;
+                self.idx = idx;
+                self.invalid_resume = false;
+            }
+        }
     }
 }
 
@@ -296,7 +343,85 @@ mod tests {
                     .value(0),
                 doc
             );
+            // HTTP rebuilds a producer between batches. Its token must point
+            // before the lookahead row, not after it, and remain small.
+            let token = scan.encode_resume();
+            assert!(token.len() < 1024);
+            scan = FileScan::raw(
+                raw_schema(false),
+                path.to_str().unwrap().into(),
+                BATCH_BYTES,
+            )
+            .unwrap();
+            scan.restore_resume(&token);
         }
         assert!(scan.batch::<i32>().unwrap().is_none());
+    }
+
+    #[test]
+    fn continuation_preserves_file_list_and_per_file_indices() {
+        let dir = tempfile::tempdir().unwrap();
+        let a = dir.path().join("a.bson");
+        let b = dir.path().join("b.bson");
+        std::fs::write(&a, [5, 0, 0, 0, 0].repeat(BATCH_ROWS - 1)).unwrap();
+        std::fs::write(&b, [5, 0, 0, 0, 0].repeat(3)).unwrap();
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("idx", DataType::Int64, false),
+            Field::new("doc", DataType::Binary, false),
+            Field::new("file", DataType::Utf8, false),
+        ]));
+        let mut scan = FileScan::dump(
+            schema.clone(),
+            vec![a.to_str().unwrap().into(), b.to_str().unwrap().into()],
+        );
+        assert_eq!(scan.batch::<i32>().unwrap().unwrap().num_rows(), BATCH_ROWS);
+        let token = scan.encode_resume();
+        // A changed glob expansion must not change the in-flight scan's files.
+        let mut resumed = FileScan::dump(schema, vec![]);
+        resumed.restore_resume(&token);
+        let batch = resumed.batch::<i32>().unwrap().unwrap();
+        let idx = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        assert_eq!(idx.values().as_ref(), &[1, 2]);
+        let files = batch
+            .column(2)
+            .as_any()
+            .downcast_ref::<arrow_array::StringArray>()
+            .unwrap();
+        assert_eq!(files.value(0), b.to_str().unwrap());
+        assert!(resumed.batch::<i32>().unwrap().is_none());
+        let token = resumed.encode_resume();
+        scan.restore_resume(&token);
+        assert!(scan.batch::<i32>().unwrap().is_none());
+    }
+
+    #[test]
+    fn continuation_preserves_strict_error_offsets_and_rejects_bad_state() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("truncated.bson");
+        let mut bytes = [5, 0, 0, 0, 0].repeat(BATCH_ROWS);
+        bytes.extend_from_slice(&[12, 0]);
+        std::fs::write(&path, bytes).unwrap();
+        let mut scan =
+            FileScan::raw(raw_schema(false), path.to_str().unwrap().into(), 1024).unwrap();
+        assert_eq!(scan.batch::<i32>().unwrap().unwrap().num_rows(), BATCH_ROWS);
+        let token = scan.encode_resume();
+        let mut resumed =
+            FileScan::raw(raw_schema(false), path.to_str().unwrap().into(), 1024).unwrap();
+        resumed.restore_resume(&token);
+        let error = resumed.batch::<i32>().unwrap_err().to_string();
+        assert!(
+            error.contains(&format!("byte offset {}", 5 * BATCH_ROWS)),
+            "{error}"
+        );
+        scan.restore_resume(b"invalid");
+        assert!(scan
+            .batch::<i32>()
+            .unwrap_err()
+            .to_string()
+            .contains("invalid BSON scan continuation"));
     }
 }

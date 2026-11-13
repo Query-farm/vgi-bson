@@ -4,6 +4,9 @@
 
 require-env VGI_BSON_WORKER
 
+# Transport errors must fail this integration suite, not silently skip it.
+set ignore_error_messages
+
 statement ok
 LOAD vgi;
 

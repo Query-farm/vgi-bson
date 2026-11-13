@@ -2,8 +2,8 @@
 //! `bson_seq` splitter per file, tagging each row with its source file.
 //!
 //! The mongodump on-ramp: point it at a backup directory, get one row per
-//! document, feed `doc` to decode / to_json / field. Stateless per file; no
-//! externalized scan-state (note for the proxy).
+//! document, feed `doc` to decode / to_json / field. HTTP continuations carry
+//! the original file list and next document offset.
 //!
 //! v1 reads **local-filesystem** globs. Cloud paths (`s3://`, `http(s)://`) are a
 //! roadmap item — for now, use DuckDB's own `read_blob('s3://…/*.bson')` +

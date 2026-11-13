@@ -30,10 +30,14 @@ binary DuckDB launches and talks to over Apache Arrow IPC. It decodes/encodes
     `objectid`, `timestamp`.
   - `table/` — `seq` (`bson_seq`), `dump` (`mongodump_read`).
   - `file_scan.rs` — bounded Arrow batches over local files, shared by COPY FROM
-    (strict) and `mongodump_read` (stop at corruption per file).
+    (strict) and `mongodump_read` (stop at corruption per file). HTTP continuation
+    records the original file list and next unconsumed document position.
   - `copy.rs` — bidirectional `FORMAT '<catalog>.bson'`, one raw BLOB column.
     COPY TO uses an ordered sink, execution-scoped shared storage, and atomic
     destination publication; never keep sink state on the handler instance.
+    vgi 0.51's COPY adapter does not forward continuation state; a resumable
+    factory is registered first under the hidden COPY handler name. Keep HTTP
+    multi-batch coverage when changing registration or upgrading the SDK.
 
 ## Hard rules
 

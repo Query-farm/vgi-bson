@@ -225,8 +225,9 @@ decoder surface on arbitrary and truncated bytes.
   — `vgi-bson` is the offline/at-rest complement).
 - **FLE / Queryable-Encryption decryption** — encrypted Binary subtypes (`0x06`)
   stay opaque `BLOB`; no key management, no crypto egress.
-- BSON `$jsonSchema` validation; a resumable streaming cursor over a directory of
-  dumps (use `mongodump_read`'s glob or `read_blob` + `bson_seq`).
+- BSON `$jsonSchema` validation and user-managed checkpoints across separate
+  queries. Scans do support automatic HTTP continuation within one query;
+  source files must remain unchanged while a scan is running.
 
 ## Building & testing
 

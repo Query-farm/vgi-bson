@@ -40,6 +40,8 @@ TRANSPORT="${TRANSPORT:-subprocess}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/.." && pwd)"
 STAGE="${STAGE:-$(mktemp -d)}"
+mkdir -p "$STAGE"
+STAGE="$(cd "$STAGE" && pwd)"
 
 # For http/unix we must launch the worker binary ourselves; for subprocess the
 # binary IS the LOCATION. WORKER_BIN names the compiled binary; default to the
@@ -64,11 +66,15 @@ start_server_and_set_location() {
   local kind="$1"
   : "${WORKER_BIN:?path to the bson-worker binary (WORKER_BIN)}"
   [[ -x "$WORKER_BIN" ]] || { echo "ERROR: worker binary not executable: $WORKER_BIN" >&2; exit 1; }
+  local worker_path
+  worker_path="$(cd "$(dirname "$WORKER_BIN")" && pwd)/$(basename "$WORKER_BIN")"
 
   local log="$STAGE/.worker-$kind.log"
   case "$kind" in
     http)
-      VGI_HTTP_BIND="127.0.0.1:0" "$WORKER_BIN" --http >"$log" 2>&1 &
+      # COPY paths may be relative to the runner's staged working directory.
+      # Match that cwd in the out-of-band worker, just as subprocess workers do.
+      (cd "$STAGE" && VGI_HTTP_BIND="127.0.0.1:0" exec "$worker_path" --http) >"$log" 2>&1 &
       SERVER_PID=$!
       local port=""
       for _ in $(seq 1 60); do
@@ -86,7 +92,7 @@ start_server_and_set_location() {
     unix)
       SOCK_PATH="${VGI_BSON_SOCK:-/tmp/bson.$$.sock}"
       rm -f "$SOCK_PATH" 2>/dev/null || true
-      "$WORKER_BIN" --unix "$SOCK_PATH" >"$log" 2>&1 &
+      (cd "$STAGE" && exec "$worker_path" --unix "$SOCK_PATH") >"$log" 2>&1 &
       SERVER_PID=$!
       local ready=""
       for _ in $(seq 1 60); do
@@ -144,7 +150,7 @@ done
 # fixture by RELATIVE path — resolved by the WORKER against ITS cwd. For local
 # subprocess/http the worker's cwd is $STAGE (we `cd` there below), so stage the
 # fixture too. For the Docker image_test the worker runs INSIDE the container, so
-# the caller bind-mounts test/data to the container's /app/test/data instead.
+# the caller bind-mounts the shared STAGE and uses it as the container's cwd.
 if [[ -d "$REPO/test/data" ]]; then
   mkdir -p "$STAGE/test/data"
   cp -R "$REPO/test/data/." "$STAGE/test/data/"
@@ -154,7 +160,7 @@ cd "$STAGE"
 
 # haybarn-unittest 2.0 isolates $HOME; --keep-home keeps the vgi extension
 # installed under ~/.haybarn visible to every runner invocation.
-HB_ARGS=(--keep-home)
+HB_ARGS=(--keep-home --emit-on-skip)
 
 # Warm the extension cache once: vgi from the signed community channel. A miss
 # here is only a warning — the per-test LOAD vgi; (the .test files load it
@@ -177,8 +183,7 @@ rm -f "$STAGE/test/_warm.test"
 # Guard against the silent-skip trap: DuckDB's sqllogictest runner auto-skips
 # any test whose error message contains "HTTP" (default ignore_error_messages),
 # so a broken http leg can report "All tests were skipped" with exit 0 and look
-# green. Tee the report and fail if NOTHING actually ran. (For subprocess/unix
-# there is no skip path, so this only ever bites a genuinely broken http leg.)
+# green. Tee the report and fail if ANY test was skipped.
 TEST_PATTERN="${TEST_PATTERN:-test/sql/*}"
 echo "Running suite (transport: $TRANSPORT, worker: $VGI_BSON_WORKER, pattern: $TEST_PATTERN) ..."
 REPORT="$STAGE/.report.txt"
@@ -186,7 +191,7 @@ set +e
 "$HAYBARN_UNITTEST" "${HB_ARGS[@]}" "$TEST_PATTERN" 2>&1 | tee "$REPORT"
 status="${PIPESTATUS[0]}"
 set -e
-if grep -qiE "All tests were skipped|total skipped [1-9]" "$REPORT"; then
+if grep -qiE "All tests were skipped|total skipped [1-9]|[1-9][0-9]* skipped test|\[SKIP_TEST\]" "$REPORT"; then
   echo "ERROR: tests were SKIPPED — almost certainly an ATTACH/transport error whose" >&2
   echo "       message matched the runner's default ignore list (e.g. \"HTTP\"). A skip" >&2
   echo "       is NOT a pass. Transport=$TRANSPORT worker=$VGI_BSON_WORKER." >&2

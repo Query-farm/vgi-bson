@@ -10,7 +10,7 @@
 
 use crate::validate::validate_one;
 use crate::validate::DecodeError;
-use std::io::{self, Read};
+use std::io::{self, Read, Seek, SeekFrom};
 
 /// A framing or I/O failure at a zero-based document offset in a BSON stream.
 #[derive(Debug)]
@@ -146,6 +146,16 @@ impl<R: Read> DocumentReader<R> {
     }
 }
 
+impl<R: Read + Seek> DocumentReader<R> {
+    /// Resume at a known document boundary, including after EOF or an error.
+    /// The caller must supply an offset previously returned by [`Self::offset`].
+    pub fn seek_to(&mut self, offset: u64) -> io::Result<()> {
+        self.offset = self.reader.seek(SeekFrom::Start(offset))?;
+        self.done = false;
+        Ok(())
+    }
+}
+
 fn read_error(e: io::Error) -> StreamErrorKind {
     if e.kind() == io::ErrorKind::UnexpectedEof {
         StreamErrorKind::Invalid(DecodeError::Truncated)
@@ -198,6 +208,25 @@ mod tests {
         let mut v = Vec::new();
         d.to_writer(&mut v).unwrap();
         v
+    }
+
+    #[test]
+    fn seek_restores_document_boundary_after_exhaustion() {
+        let first = enc(&doc! { "i": 1 });
+        let second = enc(&doc! { "i": 2 });
+        let mut stream = first.clone();
+        stream.extend_from_slice(&second);
+        stream.push(12); // A truncated prefix after two complete documents.
+        let mut reader = DocumentReader::new(std::io::Cursor::new(stream), 1024);
+        assert_eq!(reader.next_document().unwrap(), Some(first));
+        let boundary = reader.offset();
+        assert_eq!(reader.next_document().unwrap(), Some(second.clone()));
+        let error_offset = reader.offset();
+        assert_eq!(reader.next_document().unwrap_err().offset, error_offset);
+        assert!(reader.next_document().unwrap().is_none());
+        reader.seek_to(boundary).unwrap();
+        assert_eq!(reader.next_document().unwrap(), Some(second));
+        assert_eq!(reader.next_document().unwrap_err().offset, error_offset);
     }
 
     #[test]

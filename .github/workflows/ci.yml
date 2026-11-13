@@ -73,6 +73,12 @@ jobs:
       - name: Run SQLLogic suite against the built worker
         run: ./run_tests.sh
 
+      - name: Run SQLLogic suite over HTTP and Unix sockets
+        run: |
+          export HAYBARN_UNITTEST="$(command -v haybarn-unittest)"
+          TRANSPORT=http ci/run-integration.sh
+          TRANSPORT=unix ci/run-integration.sh
+
   metadata-quality:
     name: metadata quality (vgi-lint)
     runs-on: ubuntu-latest

@@ -2,16 +2,17 @@
 
 use std::io::{BufWriter, Write};
 use std::path::Path;
+use std::sync::Arc;
 
 use arrow_array::RecordBatch;
 use arrow_schema::{DataType, Schema};
 use bson_core::validate;
 use vgi::arguments::Arguments;
-use vgi::copy_from::{CopyFromFunction, CopyFromReadContext};
+use vgi::copy_from::{CopyFromFunction, CopyFromReadContext, CopyFromTable};
 use vgi::copy_to::{CopyToCloseContext, CopyToFunction, CopyToWriteContext};
 use vgi::storage::FunctionStorage;
-use vgi::table_function::TableProducer;
-use vgi::{ArgSpec, FunctionMetadata, Worker};
+use vgi::table_function::{TableFunction, TableProducer};
+use vgi::{ArgSpec, BindParams, BindResponse, FunctionMetadata, ProcessParams, Worker};
 use vgi_rpc::{OutputCollector, Result, RpcError};
 
 use crate::file_scan::{local_path, FileScan};
@@ -21,11 +22,55 @@ const SHARD_BYTES: usize = 8 * 1024 * 1024;
 const MANIFEST: &[u8] = b"bson-copy-manifest";
 
 pub(crate) fn register(worker: &mut Worker) {
+    // vgi 0.51's COPY adapter does not forward producer continuation state.
+    // Register the resumable factory first: equal-signature overloads resolve
+    // in registration order. Keep the SDK registration for format discovery,
+    // and hide the internal handler's overloads from direct SQL invocation.
+    worker.register_table(ResumableCopyFrom);
     worker.register_copy_from(BsonCopy);
     worker.register_copy_to(BsonCopy);
+    worker.hide_function("copy_bson");
 }
 
 struct BsonCopy;
+
+struct ResumableCopyFrom;
+
+impl TableFunction for ResumableCopyFrom {
+    fn name(&self) -> &str {
+        "copy_bson"
+    }
+    fn metadata(&self) -> FunctionMetadata {
+        metadata()
+    }
+    fn argument_specs(&self) -> Vec<ArgSpec> {
+        specs()
+    }
+
+    fn on_bind(&self, params: &BindParams) -> Result<BindResponse> {
+        let mut response = CopyFromTable(Arc::new(BsonCopy)).on_bind(params)?;
+        raw_schema(&response.output_schema)?;
+        options(&params.arguments)?;
+        // The SDK also omits copy_from when reconstructing an HTTP producer.
+        // Bind state is carried through every continuation, so keep the path
+        // there. The adapter above has already checked that COPY supplied it.
+        let cf = params.copy_from.as_ref().expect("validated by adapter");
+        local_path(&cf.file_path)?;
+        response.opaque_data = cf.file_path.as_bytes().to_vec();
+        Ok(response)
+    }
+
+    fn producer(&self, params: &ProcessParams) -> Result<Box<dyn TableProducer>> {
+        let path = std::str::from_utf8(&params.bind_opaque_data)
+            .map_err(|_| RpcError::value_error("COPY BSON: invalid bound path"))?;
+        raw_schema(&params.output_schema)?;
+        Ok(Box::new(FileScan::raw(
+            params.output_schema.clone(),
+            path.into(),
+            options(&params.arguments)?,
+        )?))
+    }
+}
 
 fn metadata() -> FunctionMetadata {
     let description = "Import or export raw BSON documents using COPY with FORMAT 'bson.bson' \
