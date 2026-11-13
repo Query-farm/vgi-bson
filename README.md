@@ -15,9 +15,9 @@ It decodes the raw BSON the live `mongo` connector never sees — **mongodump
 `.bson` files**, **oplog / change-stream** captures, **GridFS chunks**, and
 **BSON columns at rest** in the warehouse — and makes them joinable in SQL at
 scan scale, with correct Extended JSON v2 and lossless typed decode that a naive
-`json` path silently flattens or drops. Pure in-engine scalar/table compute over
-a `BLOB` column: **no network, no state, zero egress** (safe for air-gapped /
-regulated data).
+`json` path silently flattens or drops. Scalar/table compute over a `BLOB` column,
+plus local-file **COPY FROM / COPY TO** for bulk BSON import and export:
+**no network, zero egress**. COPY TO stages data in local shared storage.
 
 > **Complement, not replacement.** The live DuckDB `mongo` community extension is
 > a network connector to a running `mongod`/Atlas. `vgi-bson` is the
@@ -135,8 +135,61 @@ All functions live in the `bson.main` schema.
 | `bson_seq(stream BLOB)` | `TABLE(idx BIGINT, doc BLOB)` | Split N concatenated length-prefixed BSON documents (mongodump body / oplog batch / GridFS reassembly) into rows. Stops cleanly at a trailing partial document. |
 | `mongodump_read(glob VARCHAR)` | `TABLE(idx BIGINT, doc BLOB, file VARCHAR)` | Read a local-filesystem glob of `.bson` files and apply `bson_seq` per file. For cloud dumps use `read_blob('s3://…/*.bson') + bson_seq(content)`. |
 
+`mongodump_read` reads incrementally, emitting batches of at most 2,048 documents
+and approximately 8 MiB of document bytes (a larger individual document occupies
+its own batch). It retains its permissive behavior: stop each file at the first
+malformed or partial document, then continue with the next file. Use COPY for a
+strict import that reports corruption instead of accepting a partial file.
+
 The worker's build version is published as the catalog `implementation_version`
 (read it via `duckdb_databases().tags`), not as a scalar function.
+
+## COPY — raw BSON files
+
+COPY imports and exports concatenated BSON documents, the body format of a
+mongodump `.bson` file. Both directions use **exactly one BLOB column**, with one
+complete document per row. Bytes, field order, and BSON type tags are preserved
+without decoding and re-encoding. Typed relational COPY is not yet supported;
+use `encode` or `from_json` explicitly to construct document blobs.
+
+The format name is qualified by the attached catalog: `FORMAT 'bson.bson'` for
+`ATTACH … AS bson`, or `FORMAT 'backup.bson'` for `ATTACH … AS backup`.
+
+```sql
+-- Run in a writable DuckDB schema (not search_path = 'bson.main').
+CREATE TABLE documents (doc BLOB);
+COPY documents FROM 'users.bson' (FORMAT 'bson.bson');
+
+COPY (
+    SELECT doc FROM documents
+    WHERE bson.main.field(doc, 'status') = 'active'
+    ORDER BY bson.main.field(doc, '_id', 'objectid')
+) TO 'active-users.bson' (FORMAT 'bson.bson', MODE 'raw');
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `MODE` | `'raw'` | The only supported mode; exactly one BLOB column. |
+| `MAX_DOCUMENT_SIZE` | `16777216` | Maximum bytes per document, including the length prefix, on import and export. May be set from 5 through 2147483647. |
+
+COPY FROM streams bounded batches and fails on malformed documents, duplicate
+keys, or truncated input, reporting the filename and zero-based byte offset of
+the failing document. The import is rolled back on failure. COPY TO rejects NULL
+rows and blobs containing anything other than one valid document. An empty
+export creates a zero-byte file; an empty import inserts zero rows.
+
+Export preserves its source order; use `ORDER BY` when order matters. Batches are
+staged in execution-scoped shared storage, so sink calls and finalization can run
+in different worker processes. Finalization reads one staged chunk at a time,
+flushes a temporary file in the destination directory, and atomically replaces
+the destination. A failed export leaves an existing destination intact. Temporary
+storage therefore needs space for the staged output and the destination file.
+
+Paths refer to the **worker's filesystem**. COPY currently accepts a single local,
+uncompressed file, not cloud URLs, globs, gzip files, or `mongodump --archive`
+containers. In a browser this means the worker's virtual filesystem, not the
+user's host filesystem. COPY operates on document files, not collection metadata
+or indexes.
 
 ## BSON → DuckDB type mapping
 

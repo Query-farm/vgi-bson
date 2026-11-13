@@ -11,13 +11,11 @@
 
 use std::sync::Arc;
 
-use arrow_array::builder::{BinaryBuilder, Int64Builder, StringBuilder};
-use arrow_array::{ArrayRef, RecordBatch};
+use crate::file_scan::FileScan;
 use arrow_schema::{DataType, Field, Schema, SchemaRef};
-use bson_core::seq;
 use vgi::table_function::{TableFunction, TableProducer};
 use vgi::{ArgSpec, BindParams, BindResponse, FunctionMetadata, ProcessParams};
-use vgi_rpc::{OutputCollector, Result, RpcError};
+use vgi_rpc::{Result, RpcError};
 
 pub struct MongodumpRead;
 
@@ -96,11 +94,10 @@ impl TableFunction for MongodumpRead {
             .const_str(0)
             .ok_or_else(|| RpcError::value_error("mongodump_read: a constant glob is required"))?;
         let files = expand_glob(&pattern)?;
-        Ok(Box::new(DumpProducer {
-            schema: params.output_schema.clone(),
+        Ok(Box::new(FileScan::dump(
+            params.output_schema.clone(),
             files,
-            done: false,
-        }))
+        )))
     }
 }
 
@@ -117,45 +114,4 @@ fn expand_glob(pattern: &str) -> Result<Vec<String>> {
     };
     out.sort();
     Ok(out)
-}
-
-struct DumpProducer {
-    schema: SchemaRef,
-    files: Vec<String>,
-    done: bool,
-}
-
-impl TableProducer for DumpProducer {
-    fn next_batch(&mut self, _out: &mut OutputCollector) -> Result<Option<RecordBatch>> {
-        if self.done {
-            return Ok(None);
-        }
-        self.done = true;
-
-        let mut idx_b = Int64Builder::new();
-        let mut doc_b = BinaryBuilder::new();
-        let mut file_b = StringBuilder::new();
-        for path in &self.files {
-            let bytes = std::fs::read(path)
-                .map_err(|e| RpcError::runtime_error(format!("read {path}: {e}")))?;
-            for d in seq::split(&bytes) {
-                idx_b.append_value(d.idx);
-                doc_b.append_value(&d.doc);
-                file_b.append_value(path);
-            }
-        }
-        let columns: Vec<ArrayRef> = vec![
-            Arc::new(idx_b.finish()),
-            Arc::new(doc_b.finish()),
-            Arc::new(file_b.finish()),
-        ];
-        Ok(Some(
-            RecordBatch::try_new(self.schema.clone(), columns)
-                .map_err(|e| RpcError::runtime_error(e.to_string()))?,
-        ))
-    }
-    fn resume_supported(&self) -> bool {
-        // Single batch: every file is read in one next_batch() call, so there is no cursor to resume.
-        false
-    }
 }

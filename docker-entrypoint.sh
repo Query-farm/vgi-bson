@@ -9,8 +9,8 @@
 #   stdio            a worker DuckDB spawns over stdio (on-host execution).
 # Any other first argument is exec'd verbatim (escape hatch for debugging).
 #
-# The worker is stateless (pure BLOB compute), so there is no /data to create and
-# no state env to wire — each mode just exec's the binary.
+# The SDK manages execution-scoped COPY staging in shared temporary storage.
+# Each mode just execs the binary; callers supply any input/output mounts.
 set -e
 
 case "${1:-http}" in

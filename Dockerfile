@@ -6,12 +6,10 @@
 #   docker run -i ... IMG stdio   -> stdio worker DuckDB spawns on-host
 # See docker-entrypoint.sh.
 #
-# Like vgi-units (and unlike the Python model-registry workers) this worker is
-# STATELESS: it is pure in-engine scalar/table compute over a BLOB column — no
-# network, no state, zero egress — so there is no /data volume, no state env, and
-# no `farm.query.vgi.volumes` mount-discovery label. The image is just the binary
-# + a tiny entrypoint. The file-reading table functions (bson_seq /
-# mongodump_read) read whatever the caller passes; they hold no per-attach state.
+# Scalar functions need no persistent state. COPY TO stages execution-scoped
+# chunks in the SDK's shared temp storage; it needs writable temporary space.
+# Mount input/output directories for mongodump_read and COPY as needed, making
+# export destinations writable by uid 10001. Paths belong to the worker container.
 # syntax=docker/dockerfile:1
 
 # ---- build stage -----------------------------------------------------------
@@ -72,7 +70,7 @@ RUN apt-get update \
 COPY --from=build --chmod=0755 /bson-worker /usr/local/bin/bson-worker
 COPY --chmod=0755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
-# Run unprivileged. No state, no volume — there is nothing to own or persist.
+# Run unprivileged; temporary staging uses /tmp, and callers mount data paths.
 RUN useradd --create-home --uid 10001 app
 USER app
 

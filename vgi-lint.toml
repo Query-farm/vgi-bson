@@ -1,8 +1,9 @@
 # vgi-lint-check configuration for vgi-bson.
 #
-# Every function this worker exposes is a pure, in-engine transform over a BLOB
-# (no network, no backend, no external state), so the linter's execution rules
-# (VGI9xx) CAN run the example queries locally against the attached worker. We
+# Scalar/table examples use local fixtures or in-engine transforms over a BLOB
+# (no network). COPY uses local files and execution-scoped staging; its SQL
+# behavior is covered by test/sql/copy.test. The linter's execution rules
+# (VGI9xx) CAN run the scalar/table examples against the attached worker. We
 # therefore keep execution ENABLED and gate the whole suite — static metadata and
 # executable examples alike — at `info`.
 #

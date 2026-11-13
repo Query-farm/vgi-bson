@@ -29,6 +29,10 @@ fn exercise_all(bytes: &[u8]) {
     let _ = field::field(bytes, "a.b.0", Coerce::Infer);
     let _ = objectid::objectid_hex(bytes);
     let _ = seq::split(bytes);
+    let mut reader = seq::DocumentReader::new(bytes, 1024 * 1024);
+    while let Ok(Some(doc)) = reader.next_document() {
+        let _ = validate::validate(&doc);
+    }
     if let Ok(s) = std::str::from_utf8(bytes) {
         let _ = extjson::from_json(s);
         let _ = objectid::objectid_from_hex(s);

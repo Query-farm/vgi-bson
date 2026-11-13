@@ -12,12 +12,14 @@
 //! ObjectId, Decimal128, Binary subtypes (incl. UUID 0x04), Timestamp vs
 //! UTCDateTime — under the catalog `bson`, schema `main`.
 //!
-//! Pure in-engine scalar/table compute over a `BLOB` column: no network, no
-//! state, zero egress. It makes the raw BSON the live `mongo` connector never
+//! Scalar/table compute over a `BLOB` column plus local-file COPY import/export:
+//! no network, zero egress. It makes the raw BSON the live `mongo` connector never
 //! sees — mongodump `.bson` files, oplog / change-stream captures, GridFS chunks,
 //! and BSON-at-rest in the warehouse — joinable in SQL at scan scale.
 
 mod arrow_io;
+mod copy;
+mod file_scan;
 mod meta;
 mod scalar;
 mod table;
@@ -148,16 +150,14 @@ fn catalog_metadata(name: &str) -> CatalogModel {
         name: name.to_string(),
         comment: Some(
             "BSON (Binary JSON) decode & encode plus Extended JSON v2, typed field extraction, \
-             and mongodump/oplog/GridFS stream splitting for SQL."
+             mongodump/oplog/GridFS stream splitting, and raw BSON COPY import/export for SQL."
                 .to_string(),
         ),
         tags: vec![
             ("vgi.title".to_string(), "BSON Codec".to_string()),
             (
                 "vgi.subtitle".to_string(),
-                "Decode, encode, and inspect MongoDB BSON, from Extended JSON to mongodump, \
-                 oplog, and GridFS streams."
-                    .to_string(),
+                "Query BSON documents and move them between files and tables.".to_string(),
             ),
             (
                 "vgi.keywords".to_string(),
@@ -165,7 +165,7 @@ fn catalog_metadata(name: &str) -> CatalogModel {
                     "bson, binary json, bsonspec, mongodb, mongodump, oplog, change stream, \
                      gridfs, extended json, extjson, objectid, decimal128, uuid, timestamp, \
                      utcdatetime, binary subtype, decode, encode, to_json, from_json, field, \
-                     well_formed, type_of, migration, forensics, cdc, backup, at-rest",
+                     well_formed, type_of, migration, forensics, cdc, backup, at-rest, copy, import, export",
                 ),
             ),
             (
@@ -178,8 +178,11 @@ fn catalog_metadata(name: &str) -> CatalogModel {
                  lossless) and relaxed (human-readable) forms. Reach for this worker to put the raw \
                  BSON the live MongoDB connector never sees to work in SQL: mongodump backups, \
                  oplog and change-stream captures, GridFS chunks, and BSON columns already at rest \
-                 in the warehouse. Everything runs as pure in-engine scalar and table compute over \
-                 a `BLOB` column — no network, no state, zero egress — so it is the offline / \
+                 in the warehouse. Scalar and table functions operate on `BLOB` columns; COPY \
+                 FROM/TO with FORMAT '<catalog>.bson' imports/exports local BSON document files \
+                 through one `BLOB` column, with strict validation and byte preservation. Imports \
+                 stream bounded batches; exports stage data in shared storage and atomically \
+                 publish the output. No network, zero egress — so it is the offline / \
                  at-rest complement to a live connection, not a driver. Encrypted (FLE / \
                  Queryable-Encryption) values stay opaque."
                     .to_string(),
@@ -193,8 +196,10 @@ fn catalog_metadata(name: &str) -> CatalogModel {
                  `mongo` connector never sees: **mongodump backups**, **oplog / change-stream** \
                  captures, **GridFS chunks**, and **BSON columns at rest**. The `bson_seq` / \
                  `mongodump_read` table functions fan a concatenated `.bson` stream into one row \
-                 per document. Pure scalar / table compute over a `BLOB` column — no network, no \
-                 state, zero egress.\n\n**Out of scope:** any live MongoDB connection (that is the \
+                 per document. **COPY FROM / TO** with `FORMAT '<catalog>.bson'` imports and exports \
+                 local BSON files through one `BLOB` column, preserving bytes with strict validation. \
+                 Imports stream bounded batches; exports stage in shared storage and atomically \
+                 publish the output. No network, zero egress.\n\n**Out of scope:** any live MongoDB connection (that is the \
                  `mongo` extension's job — this is the offline/at-rest complement) and FLE / \
                  Queryable-Encryption decryption (encrypted Binary subtypes stay opaque `BLOB`)."
                     .to_string(),
@@ -296,7 +301,7 @@ fn catalog_metadata(name: &str) -> CatalogModel {
             path: Vec::new(),
             comment: Some(
                 "BSON decode / encode, Extended JSON v2, typed field extraction, and \
-                 mongodump/oplog/GridFS stream splitting."
+                 mongodump/oplog/GridFS stream splitting, and raw BSON COPY import/export."
                     .to_string(),
             ),
             tags: vec![
@@ -306,7 +311,7 @@ fn catalog_metadata(name: &str) -> CatalogModel {
                     meta::keywords_json(
                         "bson, mongodb, decode, encode, to_json, from_json, field, type_of, keys, \
                          is_valid, well_formed, objectid, timestamp, bson_seq, mongodump_read, \
-                         extended json",
+                         extended json, copy, import, export",
                     ),
                 ),
                 ("domain".to_string(), "data-serialization".to_string()),
@@ -320,7 +325,7 @@ fn catalog_metadata(name: &str) -> CatalogModel {
   {"name": "Projection", "description": "Extract a typed leaf, its BSON type, or the key set from a document by dotted path."},
   {"name": "ObjectId", "description": "Convert ObjectIds between hex and bytes and read their embedded creation time."},
   {"name": "Timestamp", "description": "Read the BSON internal (replication-clock) Timestamp's parts and wall-clock second."},
-  {"name": "Streams", "description": "Fan a concatenated length-prefixed BSON stream (mongodump / oplog / GridFS) into rows."},
+  {"name": "Streams", "description": "Split BSON streams into rows and import/export raw BSON files with COPY."},
   {"name": "Reference", "description": "Static, browsable lookup data such as the BSON element-type registry."}
 ]"#
                     .to_string(),
@@ -396,14 +401,15 @@ pub fn catalog_name() -> String {
     std::env::var("VGI_WORKER_CATALOG_NAME").unwrap_or_else(|_| "bson".to_string())
 }
 
-/// Build a fully-registered worker: every scalar and table function plus the
-/// catalog metadata. Callers choose the transport — `run()` natively,
+/// Build a fully-registered worker: scalars, tables, BSON COPY, and catalog
+/// metadata. Callers choose the transport — `run()` natively,
 /// `serve_reader_writer()` in the browser.
 pub fn build_worker() -> Worker {
     let name = catalog_name();
     let mut worker = Worker::new();
     scalar::register(&mut worker);
     table::register(&mut worker);
+    copy::register(&mut worker);
     worker.set_catalog(catalog_metadata(&name));
     worker
 }

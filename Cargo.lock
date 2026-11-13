@@ -512,6 +512,7 @@ dependencies = [
  "env_logger",
  "glob",
  "log",
+ "tempfile",
  "vgi",
  "vgi-rpc",
 ]

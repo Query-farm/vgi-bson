@@ -18,7 +18,8 @@ binary DuckDB launches and talks to over Apache Arrow IPC. It decodes/encodes
   - `field.rs` — dotted-path extract + typed `as` coercion (cast-ready strings).
   - `objectid.rs` — hex↔bytes, embedded-timestamp, dependency-free RFC 3339.
   - `typeinfo.rs` — `type_of` (incl. `binData:<subtype>`), `keys`.
-  - `seq.rs` — concatenated length-prefixed document splitter.
+  - `seq.rs` — concatenated length-prefixed document splitter and incremental
+    `DocumentReader<R: Read>` with size bounds and byte-offset errors.
 - `crates/bson-worker/` — the Arrow/VGI adapter (the actual binary).
   - `main.rs` — catalog metadata + registration.
   - `arrow_io.rs` — Arrow cell readers + nullable column builders + shared STRUCT
@@ -28,6 +29,11 @@ binary DuckDB launches and talks to over Apache Arrow IPC. It decodes/encodes
     (decode/to_json/from_json/encode/is_valid/well_formed/keys/field/type_of),
     `objectid`, `timestamp`.
   - `table/` — `seq` (`bson_seq`), `dump` (`mongodump_read`).
+  - `file_scan.rs` — bounded Arrow batches over local files, shared by COPY FROM
+    (strict) and `mongodump_read` (stop at corruption per file).
+  - `copy.rs` — bidirectional `FORMAT '<catalog>.bson'`, one raw BLOB column.
+    COPY TO uses an ordered sink, execution-scoped shared storage, and atomic
+    destination publication; never keep sink state on the handler instance.
 
 ## Hard rules
 
@@ -36,13 +42,17 @@ binary DuckDB launches and talks to over Apache Arrow IPC. It decodes/encodes
   output (or `well_formed(ok=false)`), never a crash that aborts the scan. New
   decode paths MUST funnel through `validate` (or `decode_document`) and be
   covered by the `proptest` zero-panic gate in `bson-core/tests/fuzz.rs`.
+- **COPY is strict.** Malformed documents, duplicate keys, NULL export rows, and
+  truncated input abort COPY. Errors identify a row or file/document offset.
+  Raw COPY preserves bytes; typed COPY and implicit lossy conversions are out of
+  scope. Validate both nonempty and empty-input schemas/options.
 - **A DuckDB scalar's output type is fixed at BIND time** (no data sample). A
   generic "decode any BSON" scalar therefore CANNOT return a dynamic STRUCT — it
   returns canonical Extended JSON (VARCHAR). Reserve typed STRUCT/MAP output for
   fixed-schema results (`well_formed`, `timestamp_parts`).
 - **Optional-arg scalars ship two arity overloads** (`with_mode`/`with_as`/
   `with_path`), because DuckDB binds a const argument as required.
-- **Published deps only** — `vgi = "0.51.0"` (with `vgi-rpc = "0.32.4"`), arrow 59, `bson = "3.1"` (features
+- **Published deps only** — `vgi = "0.51.0"` (protocol 3.3, with `vgi-rpc = "0.32.4"`), arrow 59, `bson = "3.1"` (features
   `compat-3-0-0`, `serde`, `serde_json-1`). The `serde_json` `preserve_order`
   feature is load-bearing: it keeps document field order through the
   Extended-JSON parse so `from_json ∘ to_json('canonical')` is byte-identical
@@ -73,6 +83,14 @@ binary.
 examples — including `bson_seq` and `mongodump_read` over the committed
 `test/data/users.bson` fixture. `run_tests.sh` builds the worker and points the
 runner at it.
+
+`test/sql/copy.test` covers bidirectional format discovery, byte-identical file
+round trips, multi-batch ordering with worker process rotation, empty files,
+import rollback, failed-export destination preservation, and invalid schemas /
+options. The malformed fixtures are deterministic: `truncated.bson` is 2,049
+empty documents followed by two bytes of a length prefix; `malformed.bson` has
+one empty document then a bad terminator; `oversized-prefix.bson` declares an
+`i32::MAX`-byte document with no body.
 
 ## Releasing
 

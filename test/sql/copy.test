@@ -1,0 +1,208 @@
+# name: test/sql/copy.test
+# description: Strict raw BSON COPY, byte preservation, streaming, ordering, and failures
+# group: [sql]
+
+require-env VGI_BSON_WORKER
+
+statement ok
+LOAD vgi;
+
+statement ok
+ATTACH 'bson' AS bson (TYPE vgi, LOCATION '{VGI_BSON_WORKER}');
+
+query TTT
+SELECT DISTINCT format_name, direction, ordered::VARCHAR FROM vgi_copy_formats()
+WHERE catalog_name = 'bson';
+----
+bson.bson	both	true
+
+statement ok
+CREATE TABLE documents (payload BLOB);
+
+query I
+COPY documents FROM 'test/data/users.bson' (FORMAT 'bson.bson');
+----
+3
+
+query I
+SELECT count(*) FROM documents WHERE bson.main.field(payload, 'name') = 'bob';
+----
+1
+
+# File bytes match exactly, including BSON type tags and document order.
+query I
+COPY (SELECT doc FROM bson.main.mongodump_read('test/data/users.bson') ORDER BY idx)
+TO '{TEST_DIR}/users-copy.bson' (FORMAT 'bson.bson', MODE 'raw');
+----
+3
+
+query T
+SELECT a.content = b.content FROM read_blob('test/data/users.bson') a,
+read_blob('{TEST_DIR}/users-copy.bson') b;
+----
+true
+
+statement ok
+CREATE TABLE copied (doc BLOB);
+
+query I
+COPY copied FROM '{TEST_DIR}/users-copy.bson' (FORMAT 'bson.bson', MODE 'raw');
+----
+3
+
+query I
+SELECT count(*) FROM (SELECT payload FROM documents EXCEPT ALL SELECT doc FROM copied);
+----
+0
+
+# Empty export/import, including replacing an existing file.
+query I
+COPY (SELECT payload FROM documents WHERE false) TO '{TEST_DIR}/empty.bson' (FORMAT 'bson.bson');
+----
+0
+
+query I
+SELECT octet_length(content) FROM read_blob('{TEST_DIR}/empty.bson');
+----
+0
+
+query I
+COPY copied FROM '{TEST_DIR}/empty.bson' (FORMAT 'bson.bson');
+----
+0
+
+# Multi-batch execution with multiple DuckDB threads and process rotation.
+statement ok
+SET threads = 4;
+
+statement ok
+ATTACH 'bson' AS rotating (TYPE vgi, LOCATION '{VGI_BSON_WORKER}', pool false);
+
+query I
+COPY (SELECT bson.main.encode({'i': i}) AS doc FROM range(12000) t(i) ORDER BY i)
+TO '{TEST_DIR}/ordered.bson' (FORMAT 'rotating.bson');
+----
+12000
+
+query II
+SELECT count(*), count(*) FILTER (WHERE bson.main.field(doc, 'i')::BIGINT <> idx)
+FROM bson.main.mongodump_read('{TEST_DIR}/ordered.bson');
+----
+12000	0
+
+statement ok
+CREATE TABLE large_copy (doc BLOB);
+
+query I
+COPY large_copy FROM '{TEST_DIR}/ordered.bson' (FORMAT 'rotating.bson');
+----
+12000
+
+query II
+SELECT count(*), sum(bson.main.field(doc, 'i')::BIGINT) FROM large_copy;
+----
+12000	71994000
+
+# Errors after a complete output batch must roll back the entire import.
+statement error
+COPY copied FROM 'test/data/truncated.bson' (FORMAT 'bson.bson');
+----
+byte offset 10245
+
+query I
+SELECT count(*) FROM copied;
+----
+3
+
+statement error
+COPY copied FROM 'test/data/malformed.bson' (FORMAT 'bson.bson');
+----
+byte offset 5
+
+statement error
+COPY copied FROM 'test/data/oversized-prefix.bson' (FORMAT 'bson.bson');
+----
+max_document_size
+
+statement error
+COPY copied FROM 'test/data/users.bson' (FORMAT 'bson.bson', MAX_DOCUMENT_SIZE 5);
+----
+max_document_size
+
+# Bad exports leave the existing file unchanged, and a subsequent COPY works.
+statement error
+COPY (SELECT NULL::BLOB) TO '{TEST_DIR}/users-copy.bson' (FORMAT 'bson.bson');
+----
+NULL document
+
+statement error
+COPY (SELECT from_hex('05000000000500000000')) TO '{TEST_DIR}/users-copy.bson' (FORMAT 'bson.bson');
+----
+trailing-bytes
+
+query T
+SELECT a.content = b.content FROM read_blob('test/data/users.bson') a,
+read_blob('{TEST_DIR}/users-copy.bson') b;
+----
+true
+
+query I
+COPY (SELECT from_hex('0500000000')) TO '{TEST_DIR}/users-copy.bson' (FORMAT 'bson.bson');
+----
+1
+
+query T
+SELECT to_hex(content) FROM read_blob('{TEST_DIR}/users-copy.bson');
+----
+0500000000
+
+query I
+COPY (SELECT payload FROM documents WHERE false) TO '{TEST_DIR}/users-copy.bson' (FORMAT 'bson.bson');
+----
+0
+
+query I
+SELECT octet_length(content) FROM read_blob('{TEST_DIR}/users-copy.bson');
+----
+0
+
+# Schema and option validation also applies to empty sources.
+statement ok
+CREATE TABLE wrong_type (doc VARCHAR);
+
+statement error
+COPY wrong_type FROM '{TEST_DIR}/empty.bson' (FORMAT 'bson.bson');
+----
+exactly one BLOB column
+
+statement error
+COPY (SELECT 1 WHERE false) TO '{TEST_DIR}/wrong.bson' (FORMAT 'bson.bson');
+----
+exactly one BLOB column
+
+statement error
+COPY (SELECT from_hex('0500000000') AS a, from_hex('0500000000') AS b)
+TO '{TEST_DIR}/wrong.bson' (FORMAT 'bson.bson');
+----
+exactly one BLOB column
+
+statement error
+COPY copied FROM '{TEST_DIR}/empty.bson' (FORMAT 'bson.bson', MODE 'typed');
+----
+raw
+
+statement error
+COPY copied FROM '{TEST_DIR}/empty.bson' (FORMAT 'bson.bson', MAX_DOCUMENT_SIZE 4);
+----
+max_document_size
+
+statement error
+COPY copied FROM 's3://example/users.bson' (FORMAT 'bson.bson');
+----
+local filesystem
+
+statement ok
+DETACH rotating;
+
+statement ok
+DETACH bson;

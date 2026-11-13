@@ -1,10 +1,10 @@
 //! `bson-core` — pure-compute BSON structural decoder, Extended-JSON v2 codec,
 //! and BSON type helpers for the `bson` VGI worker.
 //!
-//! This crate carries **no** Arrow or VGI dependency: it operates on `&[u8]` in
-//! and Rust values / JSON strings out, so it is independently testable and
-//! reusable. The worker crate (`bson-worker`) maps these results onto DuckDB's
-//! Arrow type system.
+//! This crate carries **no** Arrow or VGI dependency: it operates on `&[u8]`
+//! or generic byte readers and returns Rust values / JSON strings, so it is
+//! independently testable and reusable. The worker crate (`bson-worker`) maps
+//! these results onto DuckDB's Arrow type system.
 //!
 //! # Design discipline (untrusted input)
 //!

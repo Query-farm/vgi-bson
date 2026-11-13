@@ -11,7 +11,7 @@ statement ok
 LOAD vgi;
 
 statement ok
-ATTACH 'bson' AS bson (TYPE vgi, LOCATION '${VGI_BSON_WORKER}');
+ATTACH 'bson' AS bson (TYPE vgi, LOCATION '{VGI_BSON_WORKER}');
 
 statement ok
 SET search_path='bson.main';
