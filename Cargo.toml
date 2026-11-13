@@ -8,7 +8,7 @@ members = ["crates/bson-core", "crates/bson-worker", "crates/bson-wasm"]
 default-members = ["crates/bson-core", "crates/bson-worker"]
 
 [workspace.package]
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
 rust-version = "1.97"
 license = "MIT"

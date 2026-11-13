@@ -60,9 +60,10 @@ jobs:
       #   - stdio: run the suite through `docker run … stdio` (the on-host mode);
       #   - HTTP : the FULL suite against a SINGLE warm container (end-to-end
       #            image check via the default `http` entrypoint + /health).
-      # The suite's mongodump_read('test/data/users.bson') reads a committed
-      # fixture by RELATIVE path, resolved by the WORKER against its cwd (/app in
-      # the container), so both legs bind-mount test/data to /app/test/data.
+      # The stdio smoke mounts the read-only fixtures under /app. The HTTP COPY
+      # suite needs the runner and worker to share input/output paths, so it
+      # mounts the staged test tree at the same absolute path and uses the
+      # runner's uid/gid (exported files are private to their owner).
       # $CITEST_IMAGE is the loaded <image>:citest-amd64 ref; GH_TOKEN is provided
       # for the haybarn download.
       image_test: |
@@ -85,8 +86,12 @@ jobs:
         echo "::endgroup::"
 
         echo "::group::full SQL suite — HTTP transport (one warm container)"
-        CID=$(docker run -d -p 18000:8000 -v "$PWD/test/data:/app/test/data:ro" "$CITEST_IMAGE")
+        STAGE=$(mktemp -d)
+        mkdir -p "$STAGE/test/data"
+        cp -R test/data/. "$STAGE/test/data/"
+        CID=$(docker run -d -p 18000:8000 --user "$(id -u):$(id -g)" \
+          -w "$STAGE" -v "$STAGE:$STAGE" "$CITEST_IMAGE")
         trap 'docker rm -f "$CID" >/dev/null 2>&1 || true' EXIT
         for _ in $(seq 1 30); do curl -fsS -o /dev/null http://localhost:18000/health && break; sleep 1; done
-        TRANSPORT=http VGI_BSON_WORKER="http://localhost:18000" ci/run-integration.sh
+        TRANSPORT=http STAGE="$STAGE" VGI_BSON_WORKER="http://localhost:18000" ci/run-integration.sh
         echo "::endgroup::"
