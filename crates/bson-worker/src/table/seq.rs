@@ -1,7 +1,8 @@
 //! `bson_seq(stream)` — table function over a BLOB holding N concatenated
 //! length-prefixed BSON documents (the wire shape of a `mongodump` `.bson` file
 //! body, an oplog batch, or a GridFS reassembly). Fans one blob into one row per
-//! document.
+//! document. The stream must be a constant (DuckDB rejects a column argument,
+//! so this is not a LATERAL function).
 
 use std::sync::Arc;
 
@@ -36,11 +37,14 @@ impl TableFunction for BsonSeq {
              position) and doc (`BLOB`, the single document's bytes). This is exactly the wire shape \
              of a mongodump `.bson` file body, an oplog batch, or a GridFS reassembly. Stops \
              cleanly at the first malformed length prefix — partial trailing bytes are ignored \
-             (never panics). Feed `doc` to decode / to_json / field. Use as a LATERAL table \
-             function over a column of concatenated-BSON blobs.",
-            "LATERAL: fan a concatenated length-prefixed BSON stream into rows of `(idx BIGINT, \
-             doc BLOB)`.",
-            "bson, sequence, bson_seq, mongodump, oplog, gridfs, split, fan-out, lateral, stream, \
+             (never panics). Feed `doc` to decode / to_json / field. The `stream` argument must \
+             be a constant (a literal, a constant expression, or getvariable(...)); DuckDB does not \
+             allow a column here, so it cannot be used LATERAL over a table of blobs — for local \
+             files use mongodump_read, or store one file's read_blob content in a DuckDB \
+             variable and pass that variable via getvariable.",
+            "Fan one constant concatenated length-prefixed BSON stream into rows of `(idx BIGINT, \
+             doc BLOB)`. Not LATERAL: pass a literal or `getvariable(...)`.",
+            "bson, sequence, bson_seq, mongodump, oplog, gridfs, split, fan-out, stream, \
              concatenated, documents",
         );
         tags.push((
@@ -53,7 +57,13 @@ impl TableFunction for BsonSeq {
         ));
         tags.push((
             "vgi.example_queries".into(),
-            "[{\"description\":\"Split two concatenated empty documents.\",\"sql\":\"SELECT idx, octet_length(doc) AS n FROM bson.main.bson_seq(from_hex('05000000000500000000')) ORDER BY idx\"}]".into(),
+            crate::meta::examples_json(&[
+                (
+                    "Split two concatenated empty documents.",
+                    "SELECT idx, octet_length(doc) AS n FROM bson.main.bson_seq(from_hex('05000000000500000000')) ORDER BY idx",
+                ),
+                crate::examples::SEQ_OPLOG_OP_COUNTS,
+            ]),
         ));
         FunctionMetadata {
             description:

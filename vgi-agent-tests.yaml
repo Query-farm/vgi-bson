@@ -56,3 +56,10 @@ tasks:
   - name: "type-registry-lookup"
     reference_sql: "SELECT type_byte = '0x13' FROM bson.main.bson_types WHERE type_name = 'decimal128'"
     ignore_column_names: true
+  - name: "dump-average-age"
+    reference_sql: "SELECT avg(bson.main.field(d.doc, 'age')::INTEGER)::DOUBLE FROM bson.main.mongodump_read('test/data/users.bson') AS d"
+    ignore_column_names: true
+  - name: "dump-key-presence"
+    reference_sql: "SELECT k.key, count(*) FROM (SELECT unnest(bson.main.keys(d.doc)) AS key FROM bson.main.mongodump_read('test/data/users.bson') AS d) AS k GROUP BY k.key"
+    unordered: true
+    ignore_column_names: true

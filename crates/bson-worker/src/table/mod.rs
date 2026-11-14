@@ -1,4 +1,4 @@
-//! Table (LATERAL / glob fan-out) functions exposed by the bson worker.
+//! Table (constant-stream / glob fan-out) functions exposed by the bson worker.
 
 pub mod dump;
 pub mod seq;

@@ -39,3 +39,63 @@ pub fn object_tags(
         ("vgi.keywords".to_string(), keywords_json(keywords)),
     ]
 }
+
+/// One `vgi.example_queries` entry: a human description and its SQL.
+pub type Example = (&'static str, &'static str);
+
+/// Encode examples as the JSON list `vgi.example_queries` expects
+/// (`[{"description": …, "sql": …}, …]`), escaping each string for JSON so
+/// SQL can be written once, as plain Rust text, and shared between lists.
+pub fn examples_json(examples: &[Example]) -> String {
+    let items: Vec<String> = examples
+        .iter()
+        .map(|(description, sql)| {
+            format!(
+                "{{\"description\":{},\"sql\":{}}}",
+                json_string(description),
+                json_string(sql)
+            )
+        })
+        .collect();
+    format!("[{}]", items.join(","))
+}
+
+fn json_string(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 2);
+    out.push('"');
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\t' => out.push_str("\\t"),
+            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::examples_json;
+
+    #[test]
+    fn examples_json_escapes_quotes_and_backslashes() {
+        let got = examples_json(&[("say \"hi\"", "SELECT '{\"a\":1}', 'C:\\x'")]);
+        assert_eq!(
+            got,
+            r#"[{"description":"say \"hi\"","sql":"SELECT '{\"a\":1}', 'C:\\x'"}]"#
+        );
+    }
+
+    #[test]
+    fn examples_json_lists_entries_in_order() {
+        let got = examples_json(&[("a", "SELECT 1"), ("b", "SELECT 2")]);
+        assert_eq!(
+            got,
+            r#"[{"description":"a","sql":"SELECT 1"},{"description":"b","sql":"SELECT 2"}]"#
+        );
+    }
+}

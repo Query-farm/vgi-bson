@@ -19,6 +19,7 @@
 
 mod arrow_io;
 mod copy;
+mod examples;
 mod file_scan;
 mod meta;
 mod scalar;
@@ -135,7 +136,13 @@ fn bson_types_view() -> CatView {
             ),
             (
                 "vgi.example_queries".to_string(),
-                "[{\"description\":\"List the temporal BSON types and their Extended JSON wrappers.\",\"sql\":\"SELECT type_name, type_byte, extjson_wrapper FROM bson.main.bson_types WHERE type_class = 'temporal' ORDER BY type_name\"}]".to_string(),
+                meta::examples_json(&[
+                    (
+                        "List the temporal BSON types and their Extended JSON wrappers.",
+                        "SELECT type_name, type_byte, extjson_wrapper FROM bson.main.bson_types WHERE type_class = 'temporal' ORDER BY type_name",
+                    ),
+                    examples::DUMP_ID_TYPE_AUDIT,
+                ]),
             ),
         ],
         ..Default::default()
@@ -284,6 +291,14 @@ fn catalog_metadata(name: &str) -> CatalogModel {
   {
     "name": "type-registry-lookup",
     "prompt": "Using the bson worker's bson_types reference view, return the single boolean telling whether the BSON decimal128 type is listed with type byte '0x13'."
+  },
+  {
+    "name": "dump-average-age",
+    "prompt": "Using the bson worker, read every document of the mongodump file at the relative path test/data/users.bson, extract each document's integer age field, and return the average age across all documents as a single DOUBLE."
+  },
+  {
+    "name": "dump-key-presence",
+    "prompt": "Using the bson worker, read every document of the mongodump file at the relative path test/data/users.bson, list each document's top-level field names, and return one row per distinct field name with two columns: the field name (VARCHAR) and the number of documents containing it (BIGINT)."
   }
 ]"#
                 .to_string(),
@@ -361,15 +376,35 @@ fn catalog_metadata(name: &str) -> CatalogModel {
                 ),
                 (
                     "vgi.example_queries".to_string(),
-                    r#"[
-  {"description": "Render a BSON document as canonical (lossless) Extended JSON v2.", "sql": "SELECT bson.main.to_json(bson.main.from_json('{\"a\":1}'))"},
-  {"description": "Render the same document as relaxed, human-readable Extended JSON.", "sql": "SELECT bson.main.to_json(bson.main.from_json('{\"a\":1}'), 'relaxed')"},
-  {"description": "Extract a nested leaf by dotted path without decoding the whole document.", "sql": "SELECT bson.main.field(bson.main.from_json('{\"o\":{\"sku\":\"abc\"}}'), 'o.sku')"},
-  {"description": "Check that a tiny empty document is structurally well-formed.", "sql": "SELECT (bson.main.well_formed(from_hex('0500000000'))).ok"},
-  {"description": "Report the top-level BSON type name of a document.", "sql": "SELECT bson.main.type_of(bson.main.from_json('{\"a\":1}'))"},
-  {"description": "Fan a concatenated BSON stream into one row per document with its byte length.", "sql": "SELECT idx, octet_length(doc) AS n FROM bson.main.bson_seq(from_hex('05000000000500000000')) ORDER BY idx"}
-]"#
-                        .to_string(),
+                    meta::examples_json(&[
+                        (
+                            "Render a BSON document as canonical (lossless) Extended JSON v2.",
+                            "SELECT bson.main.to_json(bson.main.from_json('{\"a\":1}'))",
+                        ),
+                        (
+                            "Render the same document as relaxed, human-readable Extended JSON.",
+                            "SELECT bson.main.to_json(bson.main.from_json('{\"a\":1}'), 'relaxed')",
+                        ),
+                        (
+                            "Extract a nested leaf by dotted path without decoding the whole document.",
+                            "SELECT bson.main.field(bson.main.from_json('{\"o\":{\"sku\":\"abc\"}}'), 'o.sku')",
+                        ),
+                        (
+                            "Check that a tiny empty document is structurally well-formed.",
+                            "SELECT (bson.main.well_formed(from_hex('0500000000'))).ok",
+                        ),
+                        (
+                            "Report the top-level BSON type name of a document.",
+                            "SELECT bson.main.type_of(bson.main.from_json('{\"a\":1}'))",
+                        ),
+                        (
+                            "Fan a concatenated BSON stream into one row per document with its byte length.",
+                            "SELECT idx, octet_length(doc) AS n FROM bson.main.bson_seq(from_hex('05000000000500000000')) ORDER BY idx",
+                        ),
+                        examples::DUMP_ID_TYPE_AUDIT,
+                        examples::DUMP_CREATED_FROM_OBJECTID,
+                        examples::SEQ_OPLOG_OP_COUNTS,
+                    ]),
                 ),
                 (
                     // At least one guaranteed-runnable, verified example (VGI509).

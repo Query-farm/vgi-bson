@@ -70,24 +70,40 @@ SELECT d.idx,
        bson.field(d.doc, 'name')               AS name
 FROM bson.mongodump_read('/backups/2026-06-28/mydb/users.bson') AS d;
 
--- 2. Explode an oplog capture: one row per change op, with typed ObjectId + ts.
-SELECT bson.objectid_timestamp(bson.field(entry, '_id', 'objectid')) AS doc_created,
-       bson.field(entry, 'op')                                       AS op,
-       bson.field(entry, 'ns')                                       AS ns
-FROM read_blob('oplog/*.bson') AS f,
-     LATERAL bson.bson_seq(f.content) AS s(idx, entry);
+-- 2. Explode an oplog capture (`mongodump --oplog` writes oplog.bson): one row
+--    per change entry, counted by operation type (i/u/d/c/n).
+SELECT bson.field(e.doc, 'op') AS op, count(*) AS entries
+FROM bson.mongodump_read('/backups/2026-06-28/oplog.bson') AS e
+GROUP BY op
+ORDER BY op;
 
--- 3. Lossless typed projection a JSON path would corrupt: ObjectId, Decimal128, UUID.
-SELECT bson.field(doc, '_id', 'objectid')                  AS id_hex,
-       bson.field(doc, 'amount', 'decimal')::DECIMAL(38,4) AS amount,
-       bson.field(doc, 'tenant', 'uuid')::UUID             AS tenant_uuid
-FROM read_blob('warehouse/orders_bson/*.bson') AS f,
-     LATERAL bson.bson_seq(f.content) AS s(idx, doc);
+-- 3. Lossless typed projection a JSON path would corrupt: sum Decimal128 amounts
+--    exactly, per dump file.
+SELECT d.file,
+       sum(bson.field(d.doc, 'amount', 'decimal')::DECIMAL(38,4)) AS total
+FROM bson.mongodump_read('/backups/2026-06-28/shop/orders*.bson') AS d
+GROUP BY d.file
+ORDER BY d.file;
 
 -- 4. Triage: which blobs in this column are not well-formed BSON?
 SELECT path, bson.well_formed(payload).kind AS why
 FROM gridfs_chunks
 WHERE NOT bson.is_valid(payload);
+
+-- 5. Compose: when was each document created? Pull the ObjectId out of `_id`
+--    and read the creation time embedded in its first four bytes.
+SELECT d.idx,
+       bson.objectid_timestamp(bson.field(d.doc, '_id', 'objectid')) AS created,
+       bson.to_json(d.doc, 'relaxed')                                AS doc_json
+FROM bson.mongodump_read('test/data/users.bson') AS d
+ORDER BY d.idx;
+
+-- 6. A remote dump: `bson_seq` takes a constant blob (not a LATERAL column),
+--    so load one file into a variable first.
+SET VARIABLE dump = (SELECT content FROM read_blob('s3://bucket/mydb/users.bson'));
+SELECT s.idx, bson.field(s.doc, 'name') AS name
+FROM bson.bson_seq(getvariable('dump')) AS s
+ORDER BY s.idx;
 ```
 
 ## Function catalog
@@ -132,8 +148,8 @@ All functions live in the `bson.main` schema.
 
 | Function | Returns | Notes |
 | --- | --- | --- |
-| `bson_seq(stream BLOB)` | `TABLE(idx BIGINT, doc BLOB)` | Split N concatenated length-prefixed BSON documents (mongodump body / oplog batch / GridFS reassembly) into rows. Stops cleanly at a trailing partial document. |
-| `mongodump_read(glob VARCHAR)` | `TABLE(idx BIGINT, doc BLOB, file VARCHAR)` | Read a local-filesystem glob of `.bson` files and apply `bson_seq` per file. For cloud dumps use `read_blob('s3://…/*.bson') + bson_seq(content)`. |
+| `bson_seq(stream BLOB)` | `TABLE(idx BIGINT, doc BLOB)` | Split N concatenated length-prefixed BSON documents (mongodump body / oplog batch / GridFS reassembly) into rows. Stops cleanly at a trailing partial document. `stream` must be constant (a literal or `getvariable(...)`); DuckDB rejects a LATERAL column argument. |
+| `mongodump_read(glob VARCHAR)` | `TABLE(idx BIGINT, doc BLOB, file VARCHAR)` | Read a local-filesystem glob of `.bson` files and apply `bson_seq` per file. For a cloud dump, load one file with `SET VARIABLE v = (SELECT content FROM read_blob('s3://…/users.bson'))` and call `bson_seq(getvariable('v'))`. |
 
 `mongodump_read` reads incrementally, emitting batches of at most 2,048 documents
 and approximately 8 MiB of document bytes (a larger individual document occupies

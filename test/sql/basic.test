@@ -157,6 +157,46 @@ SELECT field(doc, 'name') FROM mongodump_read('test/data/users.bson') WHERE idx 
 ----
 bob
 
+# --- composed examples (crates/bson-worker/src/examples.rs) ---------------
+
+# mongodump_read -> type_of -> joined to the bson_types registry.
+query TTTI
+SELECT t.type_name, t.type_byte, t.extjson_wrapper, count(*) AS docs FROM bson.main.mongodump_read('test/data/users.bson') AS d JOIN bson.main.bson_types AS t ON t.type_name = bson.main.type_of(d.doc, '_id') GROUP BY t.type_name, t.type_byte, t.extjson_wrapper ORDER BY docs DESC, t.type_name;
+----
+objectId	0x07	{"$oid":"…"}	3
+
+# mongodump_read -> field(_id, objectid) -> objectid_timestamp, plus to_json.
+query ITT
+SELECT d.idx, epoch(bson.main.objectid_timestamp(bson.main.field(d.doc, '_id', 'objectid')))::BIGINT AS created, bson.main.to_json(d.doc, 'relaxed') AS doc_json FROM bson.main.mongodump_read('test/data/users.bson') AS d ORDER BY d.idx;
+----
+0	1416994483	{"_id":{"$oid":"54759eb3c090d83494e2d804"},"name":"alice","age":30}
+1	1416994483	{"_id":{"$oid":"54759eb3c090d83494e2d805"},"name":"bob","age":25}
+2	1416994483	{"_id":{"$oid":"54759eb3c090d83494e2d806"},"name":"carol","age":41}
+
+# from_json stream -> bson_seq -> field, aggregated.
+query TI
+SELECT bson.main.field(s.doc, 'op') AS op, count(*) AS entries FROM bson.main.bson_seq(bson.main.from_json('{"op":"i","ns":"shop.orders"}') || bson.main.from_json('{"op":"u","ns":"shop.orders"}') || bson.main.from_json('{"op":"i","ns":"shop.users"}')) AS s GROUP BY op ORDER BY op;
+----
+i	2
+u	1
+
+# bson_seq takes a constant stream, not a LATERAL column (the documented
+# workaround for a blob read from a file is a variable).
+statement error
+SELECT s.idx FROM read_blob('test/data/users.bson') AS f, LATERAL bson.main.bson_seq(f.content) AS s;
+----
+lateral
+
+statement ok
+SET VARIABLE users_dump = (SELECT content FROM read_blob('test/data/users.bson'));
+
+query IT
+SELECT s.idx, bson.main.field(s.doc, 'name') AS name FROM bson.main.bson_seq(getvariable('users_dump')) AS s ORDER BY s.idx;
+----
+0	alice
+1	bob
+2	carol
+
 # --- version -------------------------------------------------------------
 # The worker build version is published as the catalog implementation_version
 # (no bson_version() scalar; VGI328). The resolved version rides the attached

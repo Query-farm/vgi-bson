@@ -6,8 +6,9 @@
 //! the original file list and next document offset.
 //!
 //! v1 reads **local-filesystem** globs. Cloud paths (`s3://`, `http(s)://`) are a
-//! roadmap item — for now, use DuckDB's own `read_blob('s3://…/*.bson')` +
-//! `bson_seq(content)` for remote dumps (the worker opens no sockets of its own).
+//! roadmap item — for now, load one remote file with DuckDB's own `read_blob`
+//! into a variable and split it with `bson_seq(getvariable(…))` (the worker opens
+//! no sockets of its own; `bson_seq` takes a constant, not a LATERAL column).
 
 use std::sync::Arc;
 
@@ -41,9 +42,9 @@ impl TableFunction for MongodumpRead {
              zero-based position), doc (`BLOB`, one document), and file (`VARCHAR`, the source path). \
              Point it at a backup directory (e.g. '/backups/mydb/*.bson') to get every document \
              joinable in SQL, then feed `doc` to decode / to_json / field. Stops cleanly at any \
-             trailing partial document. v1 reads local-filesystem globs; for cloud dumps use \
-             read_blob('s3://…/*.bson') + bson_seq(content). The worker opens no sockets of its \
-             own.",
+             trailing partial document. v1 reads local-filesystem globs; for a cloud dump, store \
+             one file's read_blob content in a DuckDB variable and split it with bson_seq over \
+             getvariable. The worker opens no sockets of its own.",
             "Read a glob of mongodump `.bson` files into rows of `(idx BIGINT, doc BLOB, file \
              VARCHAR)`. Local filesystem in v1.",
             "bson, mongodump, mongodb, dump, backup, .bson, read, glob, files, oplog, gridfs, \
@@ -63,7 +64,14 @@ impl TableFunction for MongodumpRead {
         // `--execute` when the worker's cwd is the checkout root (as in CI).
         tags.push((
             "vgi.example_queries".into(),
-            "[{\"description\":\"Count the documents per file in a committed mongodump .bson fixture.\",\"sql\":\"SELECT file, count(*) AS docs FROM bson.main.mongodump_read('test/data/users.bson') GROUP BY file ORDER BY file\"}]".into(),
+            crate::meta::examples_json(&[
+                (
+                    "Count the documents per file in a committed mongodump .bson fixture.",
+                    "SELECT file, count(*) AS docs FROM bson.main.mongodump_read('test/data/users.bson') GROUP BY file ORDER BY file",
+                ),
+                crate::examples::DUMP_CREATED_FROM_OBJECTID,
+                crate::examples::DUMP_ID_TYPE_AUDIT,
+            ]),
         ));
         FunctionMetadata {
             description: "Read a glob of mongodump `.bson` files into one row per document".into(),
