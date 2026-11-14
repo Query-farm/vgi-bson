@@ -1,0 +1,6 @@
+line-length = 100
+builtins = ["con", "checks", "coverage", "selected", "lengths"]
+exclude = [".venv", "artifacts", "validation", ".vgi-examples"]
+
+[lint.per-file-ignores]
+"*.ipynb" = ["E501"]

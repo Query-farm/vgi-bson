@@ -1,0 +1,722 @@
+{
+  "query": "SELECT * FROM duckdb_functions() WHERE database_name='bson' ORDER BY schema_name,function_name",
+  "columns": [
+    "database_name",
+    "database_oid",
+    "schema_name",
+    "function_name",
+    "alias_of",
+    "function_type",
+    "description",
+    "comment",
+    "tags",
+    "return_type",
+    "parameters",
+    "parameter_types",
+    "varargs",
+    "macro_definition",
+    "has_side_effects",
+    "internal",
+    "extension_name",
+    "function_oid",
+    "examples",
+    "stability",
+    "categories"
+  ],
+  "rows": [
+    [
+      "bson",
+      "22592",
+      "main",
+      "bson_seq",
+      null,
+      "table",
+      "Split a concatenated length-prefixed BSON stream into one row per document",
+      null,
+      {
+        "vgi.category": "Streams",
+        "vgi.doc_llm": "Split a `BLOB` holding N concatenated length-prefixed BSON documents (each is `int32 length ++ body ++ 0x00`) into one row per document: columns idx (`BIGINT`, zero-based position) and doc (`BLOB`, the single document's bytes). This is exactly the wire shape of a mongodump `.bson` file body, an oplog batch, or a GridFS reassembly. Stops cleanly at the first malformed length prefix \u2014 partial trailing bytes are ignored (never panics). Feed `doc` to decode / to_json / field. Use as a LATERAL table function over a column of concatenated-BSON blobs.",
+        "vgi.doc_md": "LATERAL: fan a concatenated length-prefixed BSON stream into rows of `(idx BIGINT, doc BLOB)`.",
+        "vgi.example_queries": "[{\"description\":\"Split two concatenated empty documents.\",\"sql\":\"SELECT idx, octet_length(doc) AS n FROM bson.main.bson_seq(from_hex('05000000000500000000')) ORDER BY idx\"}]",
+        "vgi.keywords": "[\"bson\",\"sequence\",\"bson_seq\",\"mongodump\",\"oplog\",\"gridfs\",\"split\",\"fan-out\",\"lateral\",\"stream\",\"concatenated\",\"documents\"]",
+        "vgi.result_columns_schema": "[\n  {\"name\": \"idx\", \"type\": \"BIGINT\", \"description\": \"Zero-based position of the document within the concatenated stream.\"},\n  {\"name\": \"doc\", \"type\": \"BLOB\", \"description\": \"The raw bytes of one framed BSON document, ready to feed to decode / to_json / field.\"}\n]",
+        "vgi.title": "BSON Sequence Split"
+      },
+      null,
+      [
+        "stream"
+      ],
+      [
+        "BLOB"
+      ],
+      null,
+      null,
+      null,
+      true,
+      null,
+      22610,
+      [],
+      null,
+      []
+    ],
+    [
+      "bson",
+      "22592",
+      "main",
+      "decode",
+      null,
+      "scalar",
+      "Decode a BSON document to its richest form (Extended JSON in v1)",
+      null,
+      {
+        "vgi.category": "Codec",
+        "vgi.doc_llm": "Decode a BSON document to its richest self-describing form and return it as text. `decode(doc)` is the zero-decisions codec: it always yields canonical MongoDB Extended JSON v2 \u2014 the lossless column that preserves ObjectId, Decimal128, `UUID`, and the Timestamp-vs-UTCDateTime distinction \u2014 and is exactly equivalent to `to_json(doc, 'canonical')`. Prefer `to_json` when you want to choose canonical vs relaxed rendering; reach for `decode` when you just want one stable lossless column and no mode decision. The optional `mode` ('auto', 'struct', 'map', 'json') is a forward-looking hint for the output shape you would like, but because a DuckDB scalar fixes its output column type at bind time with no data sample, all four currently materialize as the same canonical Extended JSON text \u2014 the argument does not yet change the result, so omit it unless you are signalling intent. For a typed projection of a known shape, cast the JSON or use `field(doc, path, as)` per leaf. Returns NULL for a malformed blob.",
+        "vgi.doc_md": "Decode BSON to its richest self-describing form \u2192 canonical Extended JSON (the stable lossless column). Equivalent to `to_json(doc, 'canonical')`; prefer `to_json` when you need the canonical/relaxed choice. `mode` \u2208 {auto, struct, map, json} is a forward-looking shape hint that currently always returns the same Extended JSON text.",
+        "vgi.example_queries": "[{\"description\":\"Decode forcing JSON mode.\",\"sql\":\"SELECT bson.main.decode(bson.main.from_json('{\\\"a\\\":1}'), 'json') AS d\"}]",
+        "vgi.keywords": "[\"bson\",\"decode\",\"struct\",\"map\",\"json\",\"extended json\",\"deserialize\",\"objectid\",\"decimal128\"]",
+        "vgi.title": "BSON Decode"
+      },
+      "VARCHAR",
+      [
+        "doc"
+      ],
+      [
+        "ANY"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22596,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "bson",
+      "22592",
+      "main",
+      "decode",
+      null,
+      "scalar",
+      "Decode a BSON document to its richest form (Extended JSON in v1), with an explicit mode",
+      null,
+      {
+        "vgi.category": "Codec",
+        "vgi.doc_llm": "Decode a BSON document to its richest self-describing form and return it as text. `decode(doc)` is the zero-decisions codec: it always yields canonical MongoDB Extended JSON v2 \u2014 the lossless column that preserves ObjectId, Decimal128, `UUID`, and the Timestamp-vs-UTCDateTime distinction \u2014 and is exactly equivalent to `to_json(doc, 'canonical')`. Prefer `to_json` when you want to choose canonical vs relaxed rendering; reach for `decode` when you just want one stable lossless column and no mode decision. The optional `mode` ('auto', 'struct', 'map', 'json') is a forward-looking hint for the output shape you would like, but because a DuckDB scalar fixes its output column type at bind time with no data sample, all four currently materialize as the same canonical Extended JSON text \u2014 the argument does not yet change the result, so omit it unless you are signalling intent. For a typed projection of a known shape, cast the JSON or use `field(doc, path, as)` per leaf. Returns NULL for a malformed blob.",
+        "vgi.doc_md": "Decode BSON to its richest self-describing form \u2192 canonical Extended JSON (the stable lossless column). Equivalent to `to_json(doc, 'canonical')`; prefer `to_json` when you need the canonical/relaxed choice. `mode` \u2208 {auto, struct, map, json} is a forward-looking shape hint that currently always returns the same Extended JSON text.",
+        "vgi.example_queries": "[{\"description\":\"Decode forcing JSON mode.\",\"sql\":\"SELECT bson.main.decode(bson.main.from_json('{\\\"a\\\":1}'), 'json') AS d\"}]",
+        "vgi.keywords": "[\"bson\",\"decode\",\"struct\",\"map\",\"json\",\"extended json\",\"deserialize\",\"objectid\",\"decimal128\"]",
+        "vgi.title": "BSON Decode"
+      },
+      "VARCHAR",
+      [
+        "doc",
+        "mode"
+      ],
+      [
+        "ANY",
+        "VARCHAR"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22596,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "bson",
+      "22592",
+      "main",
+      "encode",
+      null,
+      "scalar",
+      "Encode a DuckDB STRUCT/MAP value as a BSON document",
+      null,
+      {
+        "vgi.category": "Codec",
+        "vgi.doc_llm": "Encode a DuckDB value as a BSON document. `STRUCT` \u2192 embedded document; `MAP` \u2192 document; `LIST` \u2192 array; `TIMESTAMP`/`TIMESTAMPTZ` \u2192 UTCDateTime; `UUID` \u2192 Binary subtype 0x04; `BLOB` \u2192 Binary subtype 0x00; integers \u2192 Int32/Int64 by range; `DOUBLE` \u2192 Double; `DECIMAL` \u2192 Decimal128. The top-level value MUST be a document (a `STRUCT` or `MAP`) \u2014 BSON has no top-level scalar, so a bare scalar raises an error. Returns NULL for a NULL input.",
+        "vgi.doc_md": "Encode a DuckDB `STRUCT`/`MAP` as BSON document bytes. The inverse of `decode` / the typed companion of `from_json`.",
+        "vgi.example_queries": "[{\"description\":\"Encode a struct to BSON and hex it.\",\"sql\":\"SELECT to_hex(bson.main.encode({'a': 1, 'b': 'x'})) AS h\"}]",
+        "vgi.keywords": "[\"bson\",\"encode\",\"serialize\",\"struct\",\"map\",\"list\",\"timestamp\",\"uuid\",\"decimal\",\"document\"]",
+        "vgi.title": "BSON Encode"
+      },
+      "BLOB",
+      [
+        "value"
+      ],
+      [
+        "ANY"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22597,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "bson",
+      "22592",
+      "main",
+      "field",
+      null,
+      "scalar",
+      "Extract a BSON field by dotted path (inferred leaf rendering)",
+      null,
+      {
+        "vgi.category": "Projection",
+        "vgi.doc_llm": "Extract one field from a BSON document by dotted path ('o._id', 'items.0.sku') without materializing the whole document, returning a `VARCHAR`. The optional `as` argument coerces the leaf to a cast-ready string: 'objectid' \u2192 24-hex, 'decimal' \u2192 the canonical decimal literal (cast with `::DECIMAL(38,4)`), 'uuid' \u2192 canonical `UUID` (cast with `::UUID`), 'datetime'/'timestamp' \u2192 RFC 3339 (cast with `::TIMESTAMPTZ`), 'blob' \u2192 lowercase hex, 'json' \u2192 canonical Extended JSON. With no `as` (or NULL), the leaf is inferred (scalars render bare). A missing path \u2192 NULL. Lossless typed projection a naive JSON path would corrupt.",
+        "vgi.doc_md": "Extract a field by dotted path \u2192 `VARCHAR`. `as` \u2208 {objectid, decimal, uuid, timestamp, datetime, blob, json} coerces the leaf to a cast-ready string; NULL infers.",
+        "vgi.example_queries": "[{\"description\":\"Extract _id as a hex ObjectId.\",\"sql\":\"SELECT bson.main.field(bson.main.from_json('{\\\"_id\\\":{\\\"$oid\\\":\\\"54759eb3c090d83494e2d804\\\"}}'), '_id', 'objectid') AS id\"}]",
+        "vgi.keywords": "[\"bson\",\"field\",\"path\",\"extract\",\"project\",\"objectid\",\"decimal\",\"uuid\",\"datetime\",\"timestamp\",\"dotted path\",\"typed\"]",
+        "vgi.title": "BSON Field Extract"
+      },
+      "VARCHAR",
+      [
+        "doc",
+        "path"
+      ],
+      [
+        "ANY",
+        "VARCHAR"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22598,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "bson",
+      "22592",
+      "main",
+      "field",
+      null,
+      "scalar",
+      "Extract a BSON field by dotted path, coercing the leaf to a typed string via `as`",
+      null,
+      {
+        "vgi.category": "Projection",
+        "vgi.doc_llm": "Extract one field from a BSON document by dotted path ('o._id', 'items.0.sku') without materializing the whole document, returning a `VARCHAR`. The optional `as` argument coerces the leaf to a cast-ready string: 'objectid' \u2192 24-hex, 'decimal' \u2192 the canonical decimal literal (cast with `::DECIMAL(38,4)`), 'uuid' \u2192 canonical `UUID` (cast with `::UUID`), 'datetime'/'timestamp' \u2192 RFC 3339 (cast with `::TIMESTAMPTZ`), 'blob' \u2192 lowercase hex, 'json' \u2192 canonical Extended JSON. With no `as` (or NULL), the leaf is inferred (scalars render bare). A missing path \u2192 NULL. Lossless typed projection a naive JSON path would corrupt.",
+        "vgi.doc_md": "Extract a field by dotted path \u2192 `VARCHAR`. `as` \u2208 {objectid, decimal, uuid, timestamp, datetime, blob, json} coerces the leaf to a cast-ready string; NULL infers.",
+        "vgi.example_queries": "[{\"description\":\"Extract _id as a hex ObjectId.\",\"sql\":\"SELECT bson.main.field(bson.main.from_json('{\\\"_id\\\":{\\\"$oid\\\":\\\"54759eb3c090d83494e2d804\\\"}}'), '_id', 'objectid') AS id\"}]",
+        "vgi.keywords": "[\"bson\",\"field\",\"path\",\"extract\",\"project\",\"objectid\",\"decimal\",\"uuid\",\"datetime\",\"timestamp\",\"dotted path\",\"typed\"]",
+        "vgi.title": "BSON Field Extract"
+      },
+      "VARCHAR",
+      [
+        "doc",
+        "path",
+        "as"
+      ],
+      [
+        "ANY",
+        "VARCHAR",
+        "VARCHAR"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22598,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "bson",
+      "22592",
+      "main",
+      "from_json",
+      null,
+      "scalar",
+      "Encode an Extended JSON v2 string as BSON document bytes",
+      null,
+      {
+        "vgi.category": "Codec",
+        "vgi.doc_llm": "Parse a MongoDB Extended JSON v2 string (canonical OR relaxed) into BSON document bytes. Interprets the typed wrappers ({\"$oid\":\u2026}, {\"$numberDecimal\":\u2026}, {\"$date\":\u2026}, {\"$binary\":\u2026}, {\"$timestamp\":\u2026}, \u2026). Round-trips decode\u2218encode\u2218to_json('canonical') to byte-identity on canonical inputs. Returns NULL on invalid JSON or a non-document top-level value.",
+        "vgi.doc_md": "Encode Extended JSON v2 text as BSON document bytes. Inverse of `to_json`.",
+        "vgi.example_queries": "[{\"description\":\"Encode a JSON document to BSON and hex it.\",\"sql\":\"SELECT to_hex(bson.main.from_json('{\\\"a\\\":1}')) AS h\"}]",
+        "vgi.keywords": "[\"bson\",\"from_json\",\"encode\",\"extended json\",\"extjson\",\"oid\",\"decimal128\",\"serialize\",\"mongodb\"]",
+        "vgi.title": "Extended JSON \u2192 BSON"
+      },
+      "BLOB",
+      [
+        "extjson"
+      ],
+      [
+        "ANY"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22599,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "bson",
+      "22592",
+      "main",
+      "is_valid",
+      null,
+      "scalar",
+      "Return true iff the blob is exactly one well-formed BSON document",
+      null,
+      {
+        "vgi.category": "Validation",
+        "vgi.doc_llm": "Return TRUE iff the blob is exactly one well-formed BSON document per the BSON spec (declared length matches the bytes, types known, cstrings NUL-terminated, valid UTF-8, no trailing bytes). A cheap structural pass \u2014 it never allocates a value tree. Never errors or panics: a malformed/hostile blob simply returns FALSE; a NULL input returns NULL. See `well_formed` for the failure reason.",
+        "vgi.doc_md": "TRUE iff the blob is one well-formed BSON document. Total (never throws). See `well_formed` for the reason on failure.",
+        "vgi.example_queries": "[{\"description\":\"Validate a tiny empty BSON document (05 00 00 00 00).\",\"sql\":\"SELECT bson.main.is_valid(from_hex('0500000000')) AS ok\"}]",
+        "vgi.keywords": "[\"bson\",\"valid\",\"is_valid\",\"well-formed\",\"validate\",\"structural\",\"check\",\"triage\"]",
+        "vgi.title": "BSON Is-Valid"
+      },
+      "BOOLEAN",
+      [
+        "doc"
+      ],
+      [
+        "ANY"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22600,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "bson",
+      "22592",
+      "main",
+      "keys",
+      null,
+      "scalar",
+      "List the top-level field names of a BSON document in document order",
+      null,
+      {
+        "vgi.category": "Projection",
+        "vgi.doc_llm": "Return the top-level field names of a BSON document as a `LIST<VARCHAR>`, in document order (BSON preserves insertion order). Use it to discover the shape of a collection's documents or to drive dynamic projection. Returns NULL for a malformed blob.",
+        "vgi.doc_md": "Top-level field names \u2192 `LIST<VARCHAR>` in document order.",
+        "vgi.example_queries": "[{\"description\":\"List the keys of a {a:1,b:2} document.\",\"sql\":\"SELECT bson.main.keys(bson.main.from_json('{\\\"a\\\":1,\\\"b\\\":2}')) AS k\"}]",
+        "vgi.keywords": "[\"bson\",\"keys\",\"field names\",\"columns\",\"shape\",\"schema\",\"discovery\"]",
+        "vgi.title": "BSON Keys"
+      },
+      "VARCHAR[]",
+      [
+        "doc"
+      ],
+      [
+        "ANY"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22601,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "bson",
+      "22592",
+      "main",
+      "mongodump_read",
+      null,
+      "table",
+      "Read a glob of mongodump `.bson` files into one row per document",
+      null,
+      {
+        "vgi.category": "Streams",
+        "vgi.doc_llm": "Read a glob of mongodump `.bson` files (each a concatenation of length-prefixed BSON documents) and fan them into one row per document: columns idx (`BIGINT`, per-file zero-based position), doc (`BLOB`, one document), and file (`VARCHAR`, the source path). Point it at a backup directory (e.g. '/backups/mydb/*.bson') to get every document joinable in SQL, then feed `doc` to decode / to_json / field. Stops cleanly at any trailing partial document. v1 reads local-filesystem globs; for cloud dumps use read_blob('s3://\u2026/*.bson') + bson_seq(content). The worker opens no sockets of its own.",
+        "vgi.doc_md": "Read a glob of mongodump `.bson` files into rows of `(idx BIGINT, doc BLOB, file VARCHAR)`. Local filesystem in v1.",
+        "vgi.example_queries": "[{\"description\":\"Count the documents per file in a committed mongodump .bson fixture.\",\"sql\":\"SELECT file, count(*) AS docs FROM bson.main.mongodump_read('test/data/users.bson') GROUP BY file ORDER BY file\"}]",
+        "vgi.keywords": "[\"bson\",\"mongodump\",\"mongodb\",\"dump\",\"backup\",\".bson\",\"read\",\"glob\",\"files\",\"oplog\",\"gridfs\",\"migration\",\"fan-out\"]",
+        "vgi.result_columns_schema": "[\n  {\"name\": \"idx\", \"type\": \"BIGINT\", \"description\": \"Zero-based position of the document within its own source file.\"},\n  {\"name\": \"doc\", \"type\": \"BLOB\", \"description\": \"The raw bytes of one framed BSON document, ready to feed to decode / to_json / field.\"},\n  {\"name\": \"file\", \"type\": \"VARCHAR\", \"description\": \"Path of the source .bson file the document was read from.\"}\n]",
+        "vgi.title": "Read mongodump .bson Files"
+      },
+      null,
+      [
+        "glob"
+      ],
+      [
+        "VARCHAR"
+      ],
+      null,
+      null,
+      null,
+      true,
+      null,
+      22611,
+      [],
+      null,
+      []
+    ],
+    [
+      "bson",
+      "22592",
+      "main",
+      "objectid_from_hex",
+      null,
+      "scalar",
+      "Convert a 24-char hex ObjectId string to its 12-byte BLOB",
+      null,
+      {
+        "vgi.category": "ObjectId",
+        "vgi.doc_llm": "Convert a 24-char hexadecimal ObjectId string to its 12-byte `BLOB` form. Returns NULL for a string that is not a valid 24-char ObjectId. The inverse of objectid_hex.",
+        "vgi.doc_md": "24-char hex `VARCHAR` \u2192 12-byte ObjectId `BLOB`.",
+        "vgi.example_queries": "[{\"description\":\"12-byte ObjectId from hex.\",\"sql\":\"SELECT to_hex(bson.main.objectid_from_hex('54759eb3c090d83494e2d804')) AS b\"}]",
+        "vgi.keywords": "[\"bson\",\"objectid\",\"hex\",\"oid\",\"from hex\",\"hex to bytes\",\"decode\"]",
+        "vgi.title": "Parse an ObjectId Hex String to Bytes"
+      },
+      "BLOB",
+      [
+        "hex"
+      ],
+      [
+        "VARCHAR"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22602,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "bson",
+      "22592",
+      "main",
+      "objectid_hex",
+      null,
+      "scalar",
+      "Convert a 12-byte ObjectId BLOB to its 24-char hex string",
+      null,
+      {
+        "vgi.category": "ObjectId",
+        "vgi.doc_llm": "Convert a 12-byte ObjectId `BLOB` to its 24-char lowercase hexadecimal string. Returns NULL when the input is not exactly 12 bytes. The inverse of objectid_from_hex.",
+        "vgi.doc_md": "12-byte ObjectId `BLOB` \u2192 24-char hex `VARCHAR`.",
+        "vgi.example_queries": "[{\"description\":\"Hex of a 12-byte ObjectId.\",\"sql\":\"SELECT bson.main.objectid_hex(bson.main.objectid_from_hex('54759eb3c090d83494e2d804')) AS h\"}]",
+        "vgi.keywords": "[\"bson\",\"objectid\",\"hex\",\"oid\",\"to hex\",\"bytes to hex\",\"encode\"]",
+        "vgi.title": "ObjectId to Hex"
+      },
+      "VARCHAR",
+      [
+        "oid"
+      ],
+      [
+        "ANY"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22603,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "bson",
+      "22592",
+      "main",
+      "objectid_timestamp",
+      null,
+      "scalar",
+      "Return the creation time embedded in an ObjectId (TIMESTAMPTZ)",
+      null,
+      {
+        "vgi.category": "ObjectId",
+        "vgi.doc_llm": "Return the creation time embedded in an ObjectId as a `TIMESTAMPTZ` \u2014 the first 4 bytes of every ObjectId are the seconds since the Unix epoch. Accepts either a 24-char hex `VARCHAR` or a 12-byte `BLOB`. This is the cheap \"when was this document first written\" probe \u2014 no separate createdAt field needed. Returns NULL for a value that is not a valid ObjectId.",
+        "vgi.doc_md": "Creation time embedded in an ObjectId \u2192 `TIMESTAMPTZ`. Accepts 24-hex `VARCHAR` or 12-byte `BLOB`.",
+        "vgi.example_queries": "[{\"description\":\"Creation time of an ObjectId.\",\"sql\":\"SELECT bson.main.objectid_timestamp('54759eb3c090d83494e2d804') AS created\"}]",
+        "vgi.keywords": "[\"bson\",\"objectid\",\"timestamp\",\"created\",\"creation time\",\"oid\",\"embedded\",\"when written\"]",
+        "vgi.title": "ObjectId Embedded Timestamp"
+      },
+      "TIMESTAMP WITH TIME ZONE",
+      [
+        "oid"
+      ],
+      [
+        "ANY"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22604,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "bson",
+      "22592",
+      "main",
+      "timestamp_parts",
+      null,
+      "scalar",
+      "Return the raw (time, increment) pair of a BSON Timestamp as STRUCT(t,i)",
+      null,
+      {
+        "vgi.category": "Timestamp",
+        "vgi.doc_llm": "Normalize a BSON internal Timestamp to `STRUCT(t UINTEGER, i UINTEGER)` \u2014 the raw (time-in-seconds, increment) pair of the 0x11 replication clock. `t` orders ops to the second; `i` breaks ties within the same second. Use timestamp_to_ts for a `TIMESTAMPTZ` from `t`. Returns a NULL struct for a NULL input.",
+        "vgi.doc_md": "BSON Timestamp \u2192 `STRUCT(t UINTEGER, i UINTEGER)`: the raw (seconds, increment) pair.",
+        "vgi.example_queries": "[{\"description\":\"Read the (t, i) parts of a Timestamp.\",\"sql\":\"SELECT (bson.main.timestamp_parts({'t': 1416994483, 'i': 2})).i AS inc\"}]",
+        "vgi.keywords": "[\"bson\",\"timestamp\",\"parts\",\"increment\",\"time\",\"oplog\",\"replication\",\"0x11\",\"t\",\"i\"]",
+        "vgi.title": "BSON Timestamp Parts"
+      },
+      "STRUCT(t UINTEGER, i UINTEGER)",
+      [
+        "ts"
+      ],
+      [
+        "ANY"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22605,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "bson",
+      "22592",
+      "main",
+      "timestamp_to_ts",
+      null,
+      "scalar",
+      "Convert a BSON Timestamp STRUCT(t,i) to a TIMESTAMPTZ (from `t`)",
+      null,
+      {
+        "vgi.category": "Timestamp",
+        "vgi.doc_llm": "Convert a BSON internal Timestamp (the decoded `STRUCT(t, i)` replication clock) to a second-resolution `TIMESTAMPTZ` from its `t` (seconds-since-epoch) component \u2014 the oplog ordering clock. NOTE this is the MongoDB-internal 0x11 Timestamp, NOT the user-facing 0x09 UTCDateTime: a 0x11 value is a replication marker, not a wall-clock time. Returns NULL when the input struct has no integer `t`.",
+        "vgi.doc_md": "BSON Timestamp `STRUCT(t,i)` \u2192 `TIMESTAMPTZ` from the `t` seconds (the oplog clock).",
+        "vgi.example_queries": "[{\"description\":\"Convert a Timestamp struct to a TIMESTAMPTZ.\",\"sql\":\"SELECT bson.main.timestamp_to_ts({'t': 1416994483, 'i': 1}) AS ts\"}]",
+        "vgi.keywords": "[\"bson\",\"timestamp\",\"oplog\",\"replication\",\"ts\",\"to_ts\",\"clock\",\"0x11\",\"increment\"]",
+        "vgi.title": "BSON Timestamp \u2192 TIMESTAMPTZ"
+      },
+      "TIMESTAMP WITH TIME ZONE",
+      [
+        "ts"
+      ],
+      [
+        "ANY"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22606,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "bson",
+      "22592",
+      "main",
+      "to_json",
+      null,
+      "scalar",
+      "Render a BSON document as canonical Extended JSON v2",
+      null,
+      {
+        "vgi.category": "Codec",
+        "vgi.doc_llm": "Render a BSON document as MongoDB Extended JSON v2. `mode` is 'canonical' (default \u2014 the type-preserving, lossless form that wraps every typed value: {\"$oid\":\u2026}, {\"$numberDecimal\":\u2026}, {\"$date\":{\"$numberLong\":\u2026}}, {\"$timestamp\":{t,i}}, {\"$binary\":{base64,subType}}, {\"$minKey\":1}) or 'relaxed' (human-readable \u2014 in-range numbers and dates render natively, only out-of-range/typed values keep wrappers). Canonical is the migration/diff surface and round-trips byte-identically through from_json. to_json always succeeds on a well-formed document; returns NULL for a malformed blob.",
+        "vgi.doc_md": "Render BSON as Extended JSON v2. `mode` \u2208 {canonical (lossless, default), relaxed (readable)}.",
+        "vgi.example_queries": "[{\"description\":\"Relaxed Extended JSON of {a:1}.\",\"sql\":\"SELECT bson.main.to_json(bson.main.from_json('{\\\"a\\\":1}'), 'relaxed') AS j\"}]",
+        "vgi.keywords": "[\"bson\",\"to_json\",\"extended json\",\"extjson\",\"canonical\",\"relaxed\",\"mongodb\",\"oid\",\"decimal128\",\"date\",\"timestamp\",\"binary\",\"lossless\",\"migration\"]",
+        "vgi.title": "BSON \u2192 Extended JSON v2"
+      },
+      "VARCHAR",
+      [
+        "doc"
+      ],
+      [
+        "ANY"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22607,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "bson",
+      "22592",
+      "main",
+      "to_json",
+      null,
+      "scalar",
+      "Render a BSON document as Extended JSON v2 with an explicit mode (canonical / relaxed)",
+      null,
+      {
+        "vgi.category": "Codec",
+        "vgi.doc_llm": "Render a BSON document as MongoDB Extended JSON v2. `mode` is 'canonical' (default \u2014 the type-preserving, lossless form that wraps every typed value: {\"$oid\":\u2026}, {\"$numberDecimal\":\u2026}, {\"$date\":{\"$numberLong\":\u2026}}, {\"$timestamp\":{t,i}}, {\"$binary\":{base64,subType}}, {\"$minKey\":1}) or 'relaxed' (human-readable \u2014 in-range numbers and dates render natively, only out-of-range/typed values keep wrappers). Canonical is the migration/diff surface and round-trips byte-identically through from_json. to_json always succeeds on a well-formed document; returns NULL for a malformed blob.",
+        "vgi.doc_md": "Render BSON as Extended JSON v2. `mode` \u2208 {canonical (lossless, default), relaxed (readable)}.",
+        "vgi.example_queries": "[{\"description\":\"Relaxed Extended JSON of {a:1}.\",\"sql\":\"SELECT bson.main.to_json(bson.main.from_json('{\\\"a\\\":1}'), 'relaxed') AS j\"}]",
+        "vgi.keywords": "[\"bson\",\"to_json\",\"extended json\",\"extjson\",\"canonical\",\"relaxed\",\"mongodb\",\"oid\",\"decimal128\",\"date\",\"timestamp\",\"binary\",\"lossless\",\"migration\"]",
+        "vgi.title": "BSON \u2192 Extended JSON v2"
+      },
+      "VARCHAR",
+      [
+        "doc",
+        "mode"
+      ],
+      [
+        "ANY",
+        "VARCHAR"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22607,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "bson",
+      "22592",
+      "main",
+      "type_of",
+      null,
+      "scalar",
+      "Return the top-level BSON type name of a document",
+      null,
+      {
+        "vgi.category": "Projection",
+        "vgi.doc_llm": "Return the BSON type name at a dotted path: 'objectId', 'decimal128', 'timestamp', 'date', 'binData:uuid', 'binData:generic', 'binData:encrypted', 'minKey', 'int', 'long', 'double', 'string', 'object', 'array', \u2026 . With no `path` (or NULL) it returns the top-level type ('object'). The binData subtype is surfaced after the colon, so you can tell a `UUID`, an encrypted (FLE) blob, or a generic blob apart. A missing path \u2192 NULL. Returns NULL for a malformed blob.",
+        "vgi.doc_md": "BSON type name at a path, e.g. 'objectId', 'decimal128', 'binData:uuid'. NULL path \u2192 top-level 'object'.",
+        "vgi.example_queries": "[{\"description\":\"Type of a nested ObjectId field.\",\"sql\":\"SELECT bson.main.type_of(bson.main.from_json('{\\\"_id\\\":{\\\"$oid\\\":\\\"54759eb3c090d83494e2d804\\\"}}'), '_id') AS t\"}]",
+        "vgi.keywords": "[\"bson\",\"type_of\",\"type\",\"binData\",\"subtype\",\"objectId\",\"decimal128\",\"timestamp\",\"date\",\"peek\"]",
+        "vgi.title": "BSON Type Of"
+      },
+      "VARCHAR",
+      [
+        "doc"
+      ],
+      [
+        "ANY"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22608,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "bson",
+      "22592",
+      "main",
+      "type_of",
+      null,
+      "scalar",
+      "Return the BSON type name at a dotted path",
+      null,
+      {
+        "vgi.category": "Projection",
+        "vgi.doc_llm": "Return the BSON type name at a dotted path: 'objectId', 'decimal128', 'timestamp', 'date', 'binData:uuid', 'binData:generic', 'binData:encrypted', 'minKey', 'int', 'long', 'double', 'string', 'object', 'array', \u2026 . With no `path` (or NULL) it returns the top-level type ('object'). The binData subtype is surfaced after the colon, so you can tell a `UUID`, an encrypted (FLE) blob, or a generic blob apart. A missing path \u2192 NULL. Returns NULL for a malformed blob.",
+        "vgi.doc_md": "BSON type name at a path, e.g. 'objectId', 'decimal128', 'binData:uuid'. NULL path \u2192 top-level 'object'.",
+        "vgi.example_queries": "[{\"description\":\"Type of a nested ObjectId field.\",\"sql\":\"SELECT bson.main.type_of(bson.main.from_json('{\\\"_id\\\":{\\\"$oid\\\":\\\"54759eb3c090d83494e2d804\\\"}}'), '_id') AS t\"}]",
+        "vgi.keywords": "[\"bson\",\"type_of\",\"type\",\"binData\",\"subtype\",\"objectId\",\"decimal128\",\"timestamp\",\"date\",\"peek\"]",
+        "vgi.title": "BSON Type Of"
+      },
+      "VARCHAR",
+      [
+        "doc",
+        "path"
+      ],
+      [
+        "ANY",
+        "VARCHAR"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22608,
+      [],
+      "CONSISTENT",
+      []
+    ],
+    [
+      "bson",
+      "22592",
+      "main",
+      "well_formed",
+      null,
+      "scalar",
+      "Diagnose BSON well-formedness: STRUCT(ok BOOL, error VARCHAR, kind VARCHAR)",
+      null,
+      {
+        "vgi.category": "Validation",
+        "vgi.doc_llm": "Diagnose a BSON blob and return `STRUCT(ok BOOL, error VARCHAR, kind VARCHAR)`. `kind` is one of truncated, length-mismatch, trailing-bytes, invalid-type, bad-cstring, bad-utf8, duplicate-key, nesting-limit, bad-decimal128, bad-subtype (NULL when ok). Stricter than `is_valid`: it also flags duplicate document keys and trailing bytes. Never errors or panics on hostile input \u2014 a lying gigabyte length prefix or a 5000-deep document returns ok=false with the classified reason, so a bad row never crashes the scan.",
+        "vgi.doc_md": "Diagnose well-formedness \u2192 `STRUCT(ok, error, kind)`. `kind` \u2208 {truncated, length-mismatch, trailing-bytes, invalid-type, bad-cstring, bad-utf8, duplicate-key, nesting-limit, bad-decimal128, bad-subtype}.",
+        "vgi.example_queries": "[{\"description\":\"Diagnose a truncated document.\",\"sql\":\"SELECT (bson.main.well_formed(from_hex('0500000001'))).kind AS kind\"}]",
+        "vgi.keywords": "[\"bson\",\"well_formed\",\"validate\",\"error\",\"kind\",\"truncated\",\"length-mismatch\",\"duplicate-key\",\"robustness\",\"triage\"]",
+        "vgi.title": "BSON Well-Formed Diagnosis"
+      },
+      "STRUCT(ok BOOLEAN, \"error\" VARCHAR, kind VARCHAR)",
+      [
+        "doc"
+      ],
+      [
+        "ANY"
+      ],
+      null,
+      null,
+      false,
+      true,
+      null,
+      22609,
+      [],
+      "CONSISTENT",
+      []
+    ]
+  ]
+}

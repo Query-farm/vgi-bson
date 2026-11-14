@@ -1,0 +1,44 @@
+{
+  "query": "SELECT * FROM duckdb_views() WHERE database_name='bson' ORDER BY schema_name,view_name",
+  "columns": [
+    "database_name",
+    "database_oid",
+    "schema_name",
+    "schema_oid",
+    "view_name",
+    "view_oid",
+    "comment",
+    "tags",
+    "internal",
+    "temporary",
+    "column_count",
+    "sql",
+    "is_bound"
+  ],
+  "rows": [
+    [
+      "bson",
+      22592,
+      "main",
+      22803,
+      "bson_types",
+      22804,
+      "The BSON element-type registry: every BSON type, its one-byte type code, and its canonical Extended JSON v2 wrapper.",
+      {
+        "domain": "data-serialization",
+        "topic": "bson-mongodb",
+        "vgi.category": "Reference",
+        "vgi.doc_llm": "A static, credential-free reference view listing all 21 BSON element types: the type name `type_of` returns, the one-byte type code (0x01\u20130x13, plus 0xFF minKey and 0x7F maxKey), a coarse `type_class` for browsing, the canonical Extended JSON v2 wrapper the type serializes to, and a one-line note. Use it to map a `type_of` result to its wire code, to see how a type renders in canonical Extended JSON, or to spot the footguns \u2014 Timestamp (0x11) is a replication clock, not a wall-clock time; undefined / dbPointer / symbol are deprecated. It scans instantly with no argument, so it is the cheapest way to see real data from this worker.",
+        "vgi.doc_md": "A static reference view of the **BSON element-type registry**. One row per BSON type, with the name `type_of` returns, its one-byte type code, a coarse `type_class`, the canonical **Extended JSON v2** wrapper, and a note.\n\nHandy for mapping a `type_of` result to its wire code, seeing how a value renders in canonical Extended JSON, or spotting the footguns: `timestamp` (0x11) is the replication clock (not a wall-clock time), and `undefined` / `dbPointer` / `symbol` are deprecated.",
+        "vgi.example_queries": "[{\"description\":\"List the temporal BSON types and their Extended JSON wrappers.\",\"sql\":\"SELECT type_name, type_byte, extjson_wrapper FROM bson.main.bson_types WHERE type_class = 'temporal' ORDER BY type_name\"}]",
+        "vgi.keywords": "[\"bson\",\"type registry\",\"type code\",\"type byte\",\"element type\",\"extended json\",\"extjson\",\"wrapper\",\"objectid\",\"decimal128\",\"timestamp\",\"binData\",\"subtype\",\"reference\",\"catalog\"]",
+        "vgi.title": "BSON Type Registry"
+      },
+      false,
+      false,
+      null,
+      "CREATE VIEW bson_types AS SELECT * FROM (SELECT * FROM (VALUES ('double', '0x01', 'numeric', '{\"$numberDouble\":\"\u2026\"}', '64-bit IEEE-754 binary floating point.'), ('string', '0x02', 'text', 'plain JSON string', 'UTF-8 string.'), ('object', '0x03', 'document', 'nested {\u2026}', 'Embedded document (preserves field order).'), ('array', '0x04', 'document', 'JSON array [\u2026]', 'Array; BSON stores keys as the numeric strings \"0\",\"1\",\u2026 .'), ('binData', '0x05', 'binary', '{\"$binary\":{\"base64\":\"\u2026\",\"subType\":\"\u2026\"}}', 'Binary with a one-byte subtype (0x00 generic, 0x04 UUID, 0x06 encrypted, \u2026).'), ('undefined', '0x06', 'deprecated', '{\"$undefined\":true}', 'Deprecated; modern data uses null.'), ('objectId', '0x07', 'identifier', '{\"$oid\":\"\u2026\"}', '12-byte identifier whose first 4 bytes embed the creation time.'), ('bool', '0x08', 'scalar', 'true / false', 'Boolean.'), ('date', '0x09', 'temporal', '{\"$date\":{\"$numberLong\":\"\u2026\"}}', 'UTCDateTime: milliseconds since the Unix epoch (a wall-clock instant).'), ('null', '0x0A', 'scalar', 'null', 'Null value.'), ('regex', '0x0B', 'text', '{\"$regularExpression\":{\"pattern\":\"\u2026\",\"options\":\"\u2026\"}}', 'Regular expression.'), ('dbPointer', '0x0C', 'deprecated', '{\"$dbPointer\":{\"$ref\":\"\u2026\",\"$id\":{\"$oid\":\"\u2026\"}}}', 'Deprecated database pointer.'), ('code', '0x0D', 'code', '{\"$code\":\"\u2026\"}', 'JavaScript source without a scope.'), ('symbol', '0x0E', 'deprecated', '{\"$symbol\":\"\u2026\"}', 'Deprecated symbol type.'), ('codeWithScope', '0x0F', 'code', '{\"$code\":\"\u2026\",\"$scope\":{\u2026}}', 'JavaScript source bundled with a scope document.'), ('int', '0x10', 'numeric', '{\"$numberInt\":\"\u2026\"}', '32-bit signed integer.'), ('timestamp', '0x11', 'temporal', '{\"$timestamp\":{\"t\":\u2026,\"i\":\u2026}}', 'Internal replication clock (t seconds, i increment) \u2014 NOT a wall-clock time.'), ('long', '0x12', 'numeric', '{\"$numberLong\":\"\u2026\"}', '64-bit signed integer.'), ('decimal128', '0x13', 'numeric', '{\"$numberDecimal\":\"\u2026\"}', '128-bit IEEE-754 decimal (exact base-10).'), ('minKey', '0xFF', 'sentinel', '{\"$minKey\":1}', 'Sorts below every other BSON value.'), ('maxKey', '0x7F', 'sentinel', '{\"$maxKey\":1}', 'Sorts above every other BSON value.')) AS valueslist) AS t(type_name, type_byte, type_class, extjson_wrapper, notes);",
+      false
+    ]
+  ]
+}

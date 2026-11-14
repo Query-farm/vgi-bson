@@ -1,0 +1,379 @@
+{
+  "schema_version": 1,
+  "catalogs": {
+    "released": {
+      "path": "coverage/catalog-released.json",
+      "sha256": "020dfcb6f2afb96b7bc1e167ccd420170284b5fdec3b2fd4594e77450ad1d151",
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_sympy",
+        "reviewed_at": "2026-11-14T19:58:29.643530+00:00",
+        "catalog_sha256": "020dfcb6f2afb96b7bc1e167ccd420170284b5fdec3b2fd4594e77450ad1d151",
+        "notes": "Complete actual function/table/view exports filtered only by worker database_name, reconciled with Rust schema registration. Seventeen logical names, overloads/aliases merged. File-reading and stream/ID/time functions remain in denominator despite not being demonstrated. Current raw COPY support advertises no extra named SQL function/table/view in these exports; no COPY handler name has been filtered out. Selected scalar adapters and underlying codec/validation/field/type logic are unchanged from v0.4.0 to current public baseline; seq/lib integration differs. Current catalog uses existing previously validated native binary, without rebuilding."
+      }
+    },
+    "current": {
+      "path": "coverage/catalog-current.json",
+      "sha256": "5b18ca9c423b6a5f03f9c33d91e3275eef9b29c0f1da1632734e067a76bf67a5",
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_sympy",
+        "reviewed_at": "2026-11-14T19:58:29.643530+00:00",
+        "catalog_sha256": "5b18ca9c423b6a5f03f9c33d91e3275eef9b29c0f1da1632734e067a76bf67a5",
+        "notes": "Complete actual function/table/view exports filtered only by worker database_name, reconciled with Rust schema registration. Seventeen logical names, overloads/aliases merged. File-reading and stream/ID/time functions remain in denominator despite not being demonstrated. Current raw COPY support advertises no extra named SQL function/table/view in these exports; no COPY handler name has been filtered out. Selected scalar adapters and underlying codec/validation/field/type logic are unchanged from v0.4.0 to current public baseline; seq/lib integration differs. Current catalog uses existing previously validated native binary, without rebuilding."
+      }
+    }
+  },
+  "notebooks": [
+    {
+      "path": "01_types_through_a_json_round_trip.ipynb",
+      "sha256": "64932404c2c2844c95b3cd6d0556b80518c02151e756430222bb0a9ac81c6b5c",
+      "execution": {
+        "path": "coverage/run-01.json",
+        "sha256": "307504c612d9509d7f202fdb421d7215661fbe5a94e875c96ff871a4dfb5e544"
+      }
+    }
+  ],
+  "examples": [
+    {
+      "object": {
+        "schema": "main",
+        "name": "from_json"
+      },
+      "notebook": "01_types_through_a_json_round_trip.ipynb",
+      "sql": [
+        {
+          "cell": "309d082a",
+          "reference": "bson.main.from_json"
+        }
+      ],
+      "narrative_cells": [
+        "a74ae64e"
+      ],
+      "result_cells": [
+        "309d082a"
+      ],
+      "interpretation_cells": [
+        "72ef85db"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_sympy",
+        "reviewed_at": "2026-11-14T19:58:29.643530+00:00",
+        "notebook_sha256": "64932404c2c2844c95b3cd6d0556b80518c02151e756430222bb0a9ac81c6b5c",
+        "catalog_sha256": [
+          "020dfcb6f2afb96b7bc1e167ccd420170284b5fdec3b2fd4594e77450ad1d151",
+          "5b18ca9c423b6a5f03f9c33d91e3275eef9b29c0f1da1632734e067a76bf67a5"
+        ],
+        "purpose": "Construct explicit typed BSON fixtures, then restore canonical/relaxed representations for fidelity comparison.",
+        "finding": "Twelve original documents use explicit number/date/binary/identifier wrappers; saved BLOBs let SQL compare complete bytes. Original inputs remain fixed while the selected representation changes."
+      }
+    },
+    {
+      "object": {
+        "schema": "main",
+        "name": "to_json"
+      },
+      "notebook": "01_types_through_a_json_round_trip.ipynb",
+      "sql": [
+        {
+          "cell": "9020d22d",
+          "reference": "bson.main.to_json"
+        }
+      ],
+      "narrative_cells": [
+        "f49f3d0e"
+      ],
+      "result_cells": [
+        "9020d22d"
+      ],
+      "interpretation_cells": [
+        "ec7eb77b"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_sympy",
+        "reviewed_at": "2026-11-14T19:58:29.643530+00:00",
+        "notebook_sha256": "64932404c2c2844c95b3cd6d0556b80518c02151e756430222bb0a9ac81c6b5c",
+        "catalog_sha256": [
+          "020dfcb6f2afb96b7bc1e167ccd420170284b5fdec3b2fd4594e77450ad1d151",
+          "5b18ca9c423b6a5f03f9c33d91e3275eef9b29c0f1da1632734e067a76bf67a5"
+        ],
+        "purpose": "Measure both type-aware and display-oriented JSON representations without conflating text size with fidelity.",
+        "finding": "Literal mode branches materialize canonical and relaxed text. UTF8 byte totals remain a fixed comparison while the selected fidelity matrix changes; wrappers can preserve information at a size cost, not a measured latency cost."
+      }
+    },
+    {
+      "object": {
+        "schema": "main",
+        "name": "type_of"
+      },
+      "notebook": "01_types_through_a_json_round_trip.ipynb",
+      "sql": [
+        {
+          "cell": "9020d22d",
+          "reference": "bson.main.type_of"
+        }
+      ],
+      "narrative_cells": [
+        "848d0f36"
+      ],
+      "result_cells": [
+        "72ef85db"
+      ],
+      "interpretation_cells": [
+        "72ef85db"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_sympy",
+        "reviewed_at": "2026-11-14T19:58:29.643530+00:00",
+        "notebook_sha256": "64932404c2c2844c95b3cd6d0556b80518c02151e756430222bb0a9ac81c6b5c",
+        "catalog_sha256": [
+          "020dfcb6f2afb96b7bc1e167ccd420170284b5fdec3b2fd4594e77450ad1d151",
+          "5b18ca9c423b6a5f03f9c33d91e3275eef9b29c0f1da1632734e067a76bf67a5"
+        ],
+        "purpose": "Detect a changed BSON leaf type even when extracted text remains equal.",
+        "finding": "Canonical output preserves all twelve inspected types and bytes. Relaxed output narrows the two small Int64 fields to Int32 while their text remains 7; binary subtype is retained in the full reported type."
+      }
+    },
+    {
+      "object": {
+        "schema": "main",
+        "name": "field"
+      },
+      "notebook": "01_types_through_a_json_round_trip.ipynb",
+      "sql": [
+        {
+          "cell": "9020d22d",
+          "reference": "bson.main.field"
+        }
+      ],
+      "narrative_cells": [
+        "848d0f36"
+      ],
+      "result_cells": [
+        "72ef85db"
+      ],
+      "interpretation_cells": [
+        "c63e12bc"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_sympy",
+        "reviewed_at": "2026-11-14T19:58:29.643530+00:00",
+        "notebook_sha256": "64932404c2c2844c95b3cd6d0556b80518c02151e756430222bb0a9ac81c6b5c",
+        "catalog_sha256": [
+          "020dfcb6f2afb96b7bc1e167ccd420170284b5fdec3b2fd4594e77450ad1d151",
+          "5b18ca9c423b6a5f03f9c33d91e3275eef9b29c0f1da1632734e067a76bf67a5"
+        ],
+        "purpose": "Separate leaf text from type/whole-document identity and distinguish missing values.",
+        "finding": "Literal top-level/nested paths return comparable strings. A separate control shows explicit BSON null and string null both display as text null, whereas absent fields, invalid documents and missing documents require distinct context."
+      }
+    },
+    {
+      "object": {
+        "schema": "main",
+        "name": "well_formed"
+      },
+      "notebook": "01_types_through_a_json_round_trip.ipynb",
+      "sql": [
+        {
+          "cell": "8c55b1c7",
+          "reference": "bson.main.well_formed"
+        }
+      ],
+      "narrative_cells": [
+        "c63e12bc"
+      ],
+      "result_cells": [
+        "8c55b1c7"
+      ],
+      "interpretation_cells": [
+        "c63e12bc"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_sympy",
+        "reviewed_at": "2026-11-14T19:58:29.643530+00:00",
+        "notebook_sha256": "64932404c2c2844c95b3cd6d0556b80518c02151e756430222bb0a9ac81c6b5c",
+        "catalog_sha256": [
+          "020dfcb6f2afb96b7bc1e167ccd420170284b5fdec3b2fd4594e77450ad1d151",
+          "5b18ca9c423b6a5f03f9c33d91e3275eef9b29c0f1da1632734e067a76bf67a5"
+        ],
+        "purpose": "Diagnose unusable bytes before interpreting a missing field result.",
+        "finding": "The invalid short blob reports false with kind truncated; missing document returns NULL, and an absent leaf in a structurally valid document retains true. These are byte-level checks rather than application-schema checks."
+      }
+    },
+    {
+      "object": {
+        "schema": "main",
+        "name": "is_valid"
+      },
+      "notebook": "01_types_through_a_json_round_trip.ipynb",
+      "sql": [
+        {
+          "cell": "8c55b1c7",
+          "reference": "bson.main.is_valid"
+        }
+      ],
+      "narrative_cells": [
+        "c63e12bc"
+      ],
+      "result_cells": [
+        "8c55b1c7"
+      ],
+      "interpretation_cells": [
+        "c63e12bc"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_sympy",
+        "reviewed_at": "2026-11-14T19:58:29.643530+00:00",
+        "notebook_sha256": "64932404c2c2844c95b3cd6d0556b80518c02151e756430222bb0a9ac81c6b5c",
+        "catalog_sha256": [
+          "020dfcb6f2afb96b7bc1e167ccd420170284b5fdec3b2fd4594e77450ad1d151",
+          "5b18ca9c423b6a5f03f9c33d91e3275eef9b29c0f1da1632734e067a76bf67a5"
+        ],
+        "purpose": "Use a structural triage flag alongside diagnostic reasons while preserving NULL input.",
+        "finding": "Known valid documents return true even if the inspected field is absent, malformed bytes false, and SQL NULL remains NULL. The table separates missing data from a failed structural check."
+      }
+    },
+    {
+      "object": {
+        "schema": "main",
+        "name": "bson_types"
+      },
+      "notebook": "01_types_through_a_json_round_trip.ipynb",
+      "sql": [
+        {
+          "cell": "registry-query",
+          "reference": "bson.main.bson_types"
+        }
+      ],
+      "narrative_cells": [
+        "registry-question"
+      ],
+      "result_cells": [
+        "registry-query"
+      ],
+      "interpretation_cells": [
+        "registry-finding"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_sympy",
+        "reviewed_at": "2026-11-14T19:58:29.643530+00:00",
+        "notebook_sha256": "64932404c2c2844c95b3cd6d0556b80518c02151e756430222bb0a9ac81c6b5c",
+        "catalog_sha256": [
+          "020dfcb6f2afb96b7bc1e167ccd420170284b5fdec3b2fd4594e77450ad1d151",
+          "5b18ca9c423b6a5f03f9c33d91e3275eef9b29c0f1da1632734e067a76bf67a5"
+        ],
+        "purpose": "Interpret observed BSON type labels through the release registry and select the dimensions of a fidelity audit.",
+        "finding": "All observed categories join their type byte/class/wrapper; numeric width wrappers explain why leaf-type checks matter. Binary suffix removal applies only to registry lookup, preserving the original subtype-bearing type string."
+      }
+    },
+    {
+      "object": {
+        "schema": "main",
+        "name": "keys"
+      },
+      "notebook": "01_types_through_a_json_round_trip.ipynb",
+      "sql": [
+        {
+          "cell": "00374161",
+          "reference": "bson.main.keys"
+        }
+      ],
+      "narrative_cells": [
+        "905501a3"
+      ],
+      "result_cells": [
+        "00374161"
+      ],
+      "interpretation_cells": [
+        "905501a3"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_sympy",
+        "reviewed_at": "2026-11-14T19:58:29.643530+00:00",
+        "notebook_sha256": "64932404c2c2844c95b3cd6d0556b80518c02151e756430222bb0a9ac81c6b5c",
+        "catalog_sha256": [
+          "020dfcb6f2afb96b7bc1e167ccd420170284b5fdec3b2fd4594e77450ad1d151",
+          "5b18ca9c423b6a5f03f9c33d91e3275eef9b29c0f1da1632734e067a76bf67a5"
+        ],
+        "purpose": "Expose field-order differences that a set-of-fields or leaf-only comparison would miss.",
+        "finding": "Two documents with equal named values show key sequences [a,b] and [b,a], different canonical JSON order and unequal complete BSON bytes. Canonical Extended JSON is not universal key sorting."
+      }
+    },
+    {
+      "object": {
+        "schema": "main",
+        "name": "encode"
+      },
+      "notebook": "01_types_through_a_json_round_trip.ipynb",
+      "sql": [
+        {
+          "cell": "native-query",
+          "reference": "bson.main.encode"
+        }
+      ],
+      "narrative_cells": [
+        "native-question"
+      ],
+      "result_cells": [
+        "native-query"
+      ],
+      "interpretation_cells": [
+        "native-finding"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_sympy",
+        "reviewed_at": "2026-11-14T19:58:29.643530+00:00",
+        "notebook_sha256": "64932404c2c2844c95b3cd6d0556b80518c02151e756430222bb0a9ac81c6b5c",
+        "catalog_sha256": [
+          "020dfcb6f2afb96b7bc1e167ccd420170284b5fdec3b2fd4594e77450ad1d151",
+          "5b18ca9c423b6a5f03f9c33d91e3275eef9b29c0f1da1632734e067a76bf67a5"
+        ],
+        "purpose": "Cross-check JSON-based construction with a native typed SQL input.",
+        "finding": "Encoding a STRUCT containing BIGINT 7 yields BSON long and byte-identical output to the explicit numberLong wrapper control. This is one tested construction route, not a guarantee for all SQL types."
+      }
+    },
+    {
+      "object": {
+        "schema": "main",
+        "name": "decode"
+      },
+      "notebook": "01_types_through_a_json_round_trip.ipynb",
+      "sql": [
+        {
+          "cell": "native-query",
+          "reference": "bson.main.decode"
+        }
+      ],
+      "narrative_cells": [
+        "native-question"
+      ],
+      "result_cells": [
+        "native-query"
+      ],
+      "interpretation_cells": [
+        "native-finding"
+      ],
+      "review": {
+        "status": "approved",
+        "reviewer": "Codex /root/notebooks_sympy",
+        "reviewed_at": "2026-11-14T19:58:29.643530+00:00",
+        "notebook_sha256": "64932404c2c2844c95b3cd6d0556b80518c02151e756430222bb0a9ac81c6b5c",
+        "catalog_sha256": [
+          "020dfcb6f2afb96b7bc1e167ccd420170284b5fdec3b2fd4594e77450ad1d151",
+          "5b18ca9c423b6a5f03f9c33d91e3275eef9b29c0f1da1632734e067a76bf67a5"
+        ],
+        "purpose": "Identify the SQL output type of a rich BSON decoding path before treating it as typed columns.",
+        "finding": "decode returns VARCHAR containing canonical Extended JSON with numberLong metadata. The typed BSON value and SQL display type are distinct, and its text agrees with the canonical JSON control."
+      }
+    }
+  ]
+}

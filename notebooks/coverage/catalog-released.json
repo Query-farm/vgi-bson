@@ -1,0 +1,238 @@
+{
+  "schema_version": 1,
+  "repository": "Query-farm/vgi-bson",
+  "revision": "v0.4.0",
+  "captured_at": "2026-11-14T19:53:39.775781+00:00",
+  "default_schema": "main",
+  "scope": "all_public_functions_and_tables",
+  "complete": true,
+  "evidence": [
+    {
+      "path": "coverage/released-functions.json",
+      "sha256": "49f32cbe7d29afdd8d75f880b1cb02a3f99f1391a2e4ad5206b252e57820cc76",
+      "description": "Complete worker-filtered functions export through actual published Haybarn"
+    },
+    {
+      "path": "coverage/released-tables.json",
+      "sha256": "4a3c2e90bc7083f3ef70540fe39b44531d117a547d8a3c58c15db5c568803226",
+      "description": "Complete worker-filtered tables export through actual published Haybarn"
+    },
+    {
+      "path": "coverage/released-views.json",
+      "sha256": "ce8dce16994f5d8e6a6cc0ae9ee3fdaba493b7d4795d6f8fa4363b465e84de2a",
+      "description": "Complete worker-filtered views export through actual published Haybarn"
+    }
+  ],
+  "objects": [
+    {
+      "schema": "main",
+      "name": "bson_seq",
+      "kind": "function",
+      "signatures": [
+        "bson_seq(BLOB)"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "decode",
+      "kind": "function",
+      "signatures": [
+        "decode(ANY)"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "decode",
+      "kind": "function",
+      "signatures": [
+        "decode(ANY, VARCHAR)"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "encode",
+      "kind": "function",
+      "signatures": [
+        "encode(ANY)"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "field",
+      "kind": "function",
+      "signatures": [
+        "field(ANY, VARCHAR)"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "field",
+      "kind": "function",
+      "signatures": [
+        "field(ANY, VARCHAR, VARCHAR)"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "from_json",
+      "kind": "function",
+      "signatures": [
+        "from_json(ANY)"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "is_valid",
+      "kind": "function",
+      "signatures": [
+        "is_valid(ANY)"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "keys",
+      "kind": "function",
+      "signatures": [
+        "keys(ANY)"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "mongodump_read",
+      "kind": "function",
+      "signatures": [
+        "mongodump_read(VARCHAR)"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "objectid_from_hex",
+      "kind": "function",
+      "signatures": [
+        "objectid_from_hex(VARCHAR)"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "objectid_hex",
+      "kind": "function",
+      "signatures": [
+        "objectid_hex(ANY)"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "objectid_timestamp",
+      "kind": "function",
+      "signatures": [
+        "objectid_timestamp(ANY)"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "timestamp_parts",
+      "kind": "function",
+      "signatures": [
+        "timestamp_parts(ANY)"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "timestamp_to_ts",
+      "kind": "function",
+      "signatures": [
+        "timestamp_to_ts(ANY)"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "to_json",
+      "kind": "function",
+      "signatures": [
+        "to_json(ANY)"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "to_json",
+      "kind": "function",
+      "signatures": [
+        "to_json(ANY, VARCHAR)"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "type_of",
+      "kind": "function",
+      "signatures": [
+        "type_of(ANY)"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "type_of",
+      "kind": "function",
+      "signatures": [
+        "type_of(ANY, VARCHAR)"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "well_formed",
+      "kind": "function",
+      "signatures": [
+        "well_formed(ANY)"
+      ],
+      "authentication": "none",
+      "access": "read"
+    },
+    {
+      "schema": "main",
+      "name": "bson_types",
+      "kind": "table",
+      "signatures": [
+        "VIEW"
+      ],
+      "authentication": "none",
+      "access": "read"
+    }
+  ]
+}
