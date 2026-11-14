@@ -25,6 +25,12 @@ plus local-file **COPY FROM / COPY TO** for bulk BSON import and export:
 > GridFS table, or a BSON column in Parquet/Iceberg, `vgi-bson` decodes it where
 > the connector cannot.
 
+## Executable notebooks
+
+[What survives a BSON–JSON round trip?](notebooks/README.md) uses visible Haybarn
+SQL and synthetic typed documents to compare canonical and relaxed Extended JSON.
+Includes two charts, saved outputs and a locked notebook environment.
+
 ## Quick start
 
 Every [GitHub release](https://github.com/Query-farm/vgi-bson/releases) ships a prebuilt worker binary. The `vgi` extension downloads the one for your platform, checks its SHA-256 and caches it, so there is nothing to install besides DuckDB:
