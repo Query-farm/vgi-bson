@@ -58,6 +58,21 @@ SELECT count(*) FROM (SELECT payload FROM documents EXCEPT ALL SELECT doc FROM c
 ----
 0
 
+# The mongodump_read executable example (crates/bson-worker/src/table/dump.rs):
+# write three documents with COPY ... TO, then read the file back. It lives here,
+# not in basic.test, because the write and the read must reach the same
+# filesystem: the image's stdio smoke runs basic.test with a cold container per
+# worker spawn, so a file COPY wrote to one container's /tmp is gone by the read.
+statement ok
+COPY (SELECT bson.main.from_json(j) AS doc FROM (VALUES (1, '{"name":"alice","age":30}'), (2, '{"name":"bob","age":25}'), (3, '{"name":"carol","age":41}')) AS v(n, j) ORDER BY n) TO '{TEST_DIR}/vgi_bson_example.bson' (FORMAT 'bson.bson');
+
+query IT
+SELECT idx, bson.main.to_json(doc, 'relaxed') AS doc_json FROM bson.main.mongodump_read('{TEST_DIR}/vgi_bson_example.bson') ORDER BY idx;
+----
+0	{"name":"alice","age":30}
+1	{"name":"bob","age":25}
+2	{"name":"carol","age":41}
+
 # Empty export/import, including replacing an existing file.
 query I
 COPY (SELECT payload FROM documents WHERE false) TO '{TEST_DIR}/empty.bson' (FORMAT 'bson.bson');

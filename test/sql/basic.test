@@ -157,18 +157,6 @@ SELECT field(doc, 'name') FROM mongodump_read('test/data/users.bson') WHERE idx 
 ----
 bob
 
-# The mongodump_read executable example (crates/bson-worker/src/table/dump.rs):
-# write three documents with COPY ... TO, then read the file back.
-statement ok
-COPY (SELECT bson.main.from_json(j) AS doc FROM (VALUES (1, '{"name":"alice","age":30}'), (2, '{"name":"bob","age":25}'), (3, '{"name":"carol","age":41}')) AS v(n, j) ORDER BY n) TO '/tmp/vgi_bson_example.bson' (FORMAT 'bson.bson');
-
-query IT
-SELECT idx, bson.main.to_json(doc, 'relaxed') AS doc_json FROM bson.main.mongodump_read('/tmp/vgi_bson_example.bson') ORDER BY idx;
-----
-0	{"name":"alice","age":30}
-1	{"name":"bob","age":25}
-2	{"name":"carol","age":41}
-
 # --- composed examples (crates/bson-worker/src/examples.rs) ---------------
 
 # bson_seq over the inlined users.bson body -> type_of -> joined to the
