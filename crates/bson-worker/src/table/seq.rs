@@ -63,6 +63,8 @@ impl TableFunction for BsonSeq {
                     "SELECT idx, octet_length(doc) AS n FROM bson.main.bson_seq(from_hex('05000000000500000000')) ORDER BY idx",
                 ),
                 crate::examples::SEQ_OPLOG_OP_COUNTS,
+                crate::examples::SEQ_CREATED_FROM_OBJECTID,
+                crate::examples::SEQ_ID_TYPE_AUDIT,
             ]),
         ));
         FunctionMetadata {

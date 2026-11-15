@@ -59,19 +59,30 @@ impl TableFunction for MongodumpRead {
 ]"#
                 .into(),
         ));
-        // The example reads the committed `test/data/users.bson` fixture (three
-        // documents) via a repo-root-relative path, so it returns rows under
-        // `--execute` when the worker's cwd is the checkout root (as in CI).
+        // mongodump_read only reads the worker's local filesystem, so a
+        // repo-relative fixture path would return no rows for anyone outside
+        // this checkout. The example is therefore a guaranteed-runnable
+        // executable example: it writes a three-document file with
+        // `COPY ... TO (FORMAT 'bson.bson')` and reads it straight back.
         tags.push((
-            "vgi.example_queries".into(),
-            crate::meta::examples_json(&[
-                (
-                    "Count the documents per file in a committed mongodump .bson fixture.",
-                    "SELECT file, count(*) AS docs FROM bson.main.mongodump_read('test/data/users.bson') GROUP BY file ORDER BY file",
-                ),
-                crate::examples::DUMP_CREATED_FROM_OBJECTID,
-                crate::examples::DUMP_ID_TYPE_AUDIT,
-            ]),
+            "vgi.executable_examples".into(),
+            r#"[
+  {
+    "name": "copy_then_mongodump_read",
+    "description": "Write three documents to a mongodump-style .bson file with COPY ... TO, then read the file back with mongodump_read: one row per document with its zero-based idx, rendered as relaxed Extended JSON.",
+    "sql": [
+      {
+        "description": "Export three documents built with from_json to a raw .bson file (the COPY reports 3 rows).",
+        "sql": "COPY (SELECT bson.main.from_json(j) AS doc FROM (VALUES (1, '{\"name\":\"alice\",\"age\":30}'), (2, '{\"name\":\"bob\",\"age\":25}'), (3, '{\"name\":\"carol\",\"age\":41}')) AS v(n, j) ORDER BY n) TO '/tmp/vgi_bson_example.bson' (FORMAT 'bson.bson')"
+      },
+      {
+        "description": "Read the file back with mongodump_read: alice, bob and carol at idx 0, 1 and 2.",
+        "sql": "SELECT idx, bson.main.to_json(doc, 'relaxed') AS doc_json FROM bson.main.mongodump_read('/tmp/vgi_bson_example.bson') ORDER BY idx"
+      }
+    ]
+  }
+]"#
+            .into(),
         ));
         FunctionMetadata {
             description: "Read a glob of mongodump `.bson` files into one row per document".into(),
