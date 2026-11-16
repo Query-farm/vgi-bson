@@ -205,7 +205,7 @@ SELECT s.idx, bson.main.field(s.doc, 'name') AS name FROM bson.main.bson_seq(get
 # database's tags, surfaced after ATTACH regardless of transport.
 
 query T
-SELECT map_extract(tags, 'vgi_resolved_implementation_version')[1] = '0.5.2'
+SELECT map_extract(tags, 'vgi_resolved_implementation_version')[1] = '0.5.3'
 FROM duckdb_databases() WHERE database_name = 'bson';
 ----
 true
