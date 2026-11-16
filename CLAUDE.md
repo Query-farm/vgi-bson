@@ -74,7 +74,7 @@ cargo clippy --all-targets -- -D warnings
 cargo fmt --all -- --check
 cargo test --workspace
 RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --workspace
-./run_tests.sh        # haybarn SQLLogic E2E (LOAD vgi; ATTACH; assert examples)
+make test-sql         # haybarn SQLLogic E2E (LOAD vgi; ATTACH; assert examples)
 ```
 
 `vgi-lint` runs in CI via `Query-farm/vgi-lint-check@v2` against the release
@@ -85,8 +85,8 @@ binary.
 `test/sql/basic.test` is a haybarn SQLLogic suite: `LOAD vgi;` (NOT
 `require vgi`), `require-env VGI_BSON_WORKER`, `ATTACH`, then asserts the catalog
 examples — including `bson_seq` and `mongodump_read` over the committed
-`test/data/users.bson` fixture. `run_tests.sh` builds the worker and points the
-runner at it.
+`test/data/users.bson` fixture. `make test-sql` builds the worker and runs the
+suite over the stdio, launch and http transports (`ci/run-integration.sh`).
 
 `test/sql/copy.test` covers bidirectional format discovery, byte-identical file
 round trips, multi-batch ordering with worker process rotation, empty files,

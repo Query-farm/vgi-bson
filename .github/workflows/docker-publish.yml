@@ -98,7 +98,7 @@ jobs:
         echo "::endgroup::"
 
         echo "::group::stdio entrypoint smoke (suite, cold container per ATTACH)"
-        TRANSPORT=subprocess \
+        TRANSPORT=stdio \
           TEST_PATTERN="test/sql/basic.test" \
           VGI_BSON_WORKER="docker run -i --rm -v $PWD/test/data:/app/test/data:ro $CITEST_IMAGE stdio" \
           ci/run-integration.sh

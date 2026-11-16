@@ -259,7 +259,7 @@ decoder surface on arbitrary and truncated bytes.
 cargo build --release                       # the bson-worker binary
 cargo test --workspace                      # unit + golden vectors + proptest fuzz
 cargo clippy --all-targets -- -D warnings
-./run_tests.sh                              # haybarn SQLLogic E2E (needs the vgi ext)
+make test-sql                               # haybarn SQLLogic E2E (needs the vgi ext)
 ```
 
 The release binary is used directly as a DuckDB `vgi` `LOCATION`:
