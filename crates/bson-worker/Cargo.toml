@@ -36,7 +36,7 @@ tempfile = "3"
 # handles transport state and the ordered COPY sink's execution-scoped chunks.
 # No bundled SQLite is needed for cross-process COPY staging.
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-vgi = { workspace = true, features = ["transport-http"] }
+vgi = { workspace = true, features = ["transport-http", "blob-vendor"] }
 vgi-rpc = { workspace = true, features = ["http"] }
 env_logger = "0.11"
 
